@@ -1,0 +1,18 @@
+# Codeowners placeholder - replace with actual GitHub handles or teams
+
+# Core and app
+/core/ @asMODhias
+/app/ @asMODhias
+
+# Adapters
+/adapters/ @asMODhias
+
+# UI
+/ui/ @asMODhias
+
+# Features
+/feature/sot/ @asMODhias
+
+# CI & infra
+/.github/ @ci-maintainer
+/docker/ @ci-maintainer
