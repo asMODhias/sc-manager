@@ -56,8 +56,11 @@ impl Signer for KeyPair {
     fn sign(&self, data: &str) -> String {
         use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signature, Signer as _};
         // Reconstruct keypair from secret + public
+        // TODO(SOT): Replace `.unwrap()` with proper error handling and propagate errors instead of panicking. See `docs/04_DEV_GUIDE_COPILOT.md` (Pre-Code Checklist).
         let sk = SecretKey::from_bytes(&self.secret.to_bytes()).unwrap();
+        // TODO(SOT): Replace `.unwrap()` with proper error handling and propagate errors instead of panicking.
         let pk_bytes = base64::decode(&self.public_key_b64).unwrap();
+        // TODO(SOT): Replace `.unwrap()` with proper error handling and propagate errors instead of panicking.
         let pk = PublicKey::from_bytes(&pk_bytes).unwrap();
         let kp = Keypair { secret: sk, public: pk };
         let sig: Signature = kp.sign(data.as_bytes());
@@ -214,14 +217,17 @@ mod tests {
             let registry_cloned = registry.clone();
             let handle = thread::spawn(move || {
                 while let Ok(ev) = rx.recv() {
+                    // TODO(SOT): Replace lock().unwrap() with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
                     let mut s = seen.lock().unwrap();
                     if s.contains(&ev.id) {
                         continue; // already seen
                     }
                     // verify signature - find signer public key via registry
+                    // TODO(SOT): Replace lock().unwrap() with proper handling to surface errors rather than panic
                     let reg = registry_cloned.lock().unwrap();
                     if let Some(pk_b64) = reg.get(&ev.signer_id) {
                         // build a temporary KeyPair-like identity with public key
+                        // TODO(SOT): Replace `SecretKey::from_bytes(...).unwrap()` with error handling; using unwrap here can panic in production
                         let temp = KeyPair { id: ev.signer_id.clone(), public_key_b64: pk_b64.clone(), secret: ed25519_dalek::SecretKey::from_bytes(&[1u8;32]).unwrap() };
                         if !ev.verify(&temp) {
                             // invalid signature -> ignore
