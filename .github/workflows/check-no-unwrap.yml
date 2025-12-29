@@ -1,0 +1,43 @@
+name: Check forbidden unwrap/panic in production
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  check-no-unwrap:
+    name: Check for forbidden patterns
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Search for forbidden patterns
+        run: |
+          set -euo pipefail
+          echo "Searching for 'unwrap(' and 'panic!' in non-test source..."
+          # For pull requests, only check changed files between base and head to avoid failing on legacy occurrences
+          if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+            echo "Running check only on changed files in PR..."
+            BASE=${GITHUB_BASE_REF}
+            FILES=$(git diff --name-only origin/${BASE}...HEAD || true)
+            # Exclude test files and markdown/docs from PR checks to avoid flagging tests/docs
+            FILES=$(echo "$FILES" | grep -Ev '(^tests/|/tests/|\.md$)' || true)
+            if [ -z "$FILES" ]; then
+              echo "No changed non-test files detected."
+              exit 0
+            fi
+            matches=$(git grep -n -E "(\bunwrap\(|panic!\()" -- $FILES || true)
+          else
+            # For pushes, keep existing behaviour but still exclude tests
+            matches=$(git grep -n -E "(\bunwrap\(|panic!\()" -- ':(exclude)tests/**' ':(exclude)**/tests/**' || true)
+          fi
+
+          if [ -n "$matches" ]; then
+            echo "Forbidden patterns found:" >&2
+            echo "$matches" >&2
+            exit 1
+          fi
+          echo "No forbidden patterns found."

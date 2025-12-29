@@ -1,0 +1,142 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Local CI (PowerShell)",
+      "type": "process",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\run-local-ci.ps1"],
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": false }
+    },
+    {
+      "label": "Local CI (Bash)",
+      "type": "shell",
+      "command": "bash -lc './scripts/run-local-ci.sh'",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": false },
+      "options": { "shell": { "executable": "/bin/bash", "args": ["-c"] } }
+    },
+    {
+      "label": "Local CI (fast)",
+      "type": "shell",
+      "command": "./scripts/run-local-ci.sh",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": false }
+    },
+    {
+      "label": "Local GH Actions (act)",
+      "type": "shell",
+      "command": "./scripts/run-gh-actions-local.sh",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": false }
+    },
+    {
+      "label": "Local CI (status)",
+      "type": "shell",
+      "command": "./scripts/run-local-ci-status.sh",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": false }
+    },
+    {
+      "label": "Build Images",
+      "type": "shell",
+      "command": "bash -lc './scripts/build-images.sh'",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "options": { "shell": { "executable": "/bin/bash", "args": ["-c"] } }
+    },
+    {
+      "label": "Quick Tests (PowerShell)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/quick-tests.ps1",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": true },
+      "options": { "shell": { "executable": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"] } }
+    },
+    {
+      "label": "Core: cargo test",
+      "type": "shell",
+      "command": "cargo test",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": ["$rustc"],
+      "options": { "cwd": "${workspaceFolder}/core" }
+    },
+    {
+      "label": "Core: build tests (no-run)",
+      "type": "shell",
+      "command": "cargo test --no-run",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": ["$rustc"],
+      "options": { "cwd": "${workspaceFolder}/core" }
+    },
+    {
+      "label": "Find Test Binary & Copy (Bash)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/find-test-binary-copy.sh ${input:crateName} ${input:testName}",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "/bin/bash", "args": ["-c"] } }
+    },
+    {
+      "label": "Find Test Binary & Copy (PowerShell)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/find-test-binary-copy.ps1 -crate ${input:crateName} -name ${input:testName}",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "pwsh", "args": ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"] } }
+    },
+    {
+      "label": "Debug Test Binary (auto - Bash)",
+      "type": "shell",
+      "command": "bash -lc './scripts/debug-find-test-binary.sh \"${input:crateName}\" \"${input:testName}\"'",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "/bin/bash", "args": ["-c"] } }
+    },
+    {
+      "label": "Debug Test Binary (auto - PowerShell)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}/scripts/debug-find-test-binary.ps1\" -crate \"${input:crateName}\" -name \"${input:testName}\"",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"] } }
+    },
+    {
+      "label": "Build sc_manager_app (debug)",
+      "type": "shell",
+      "command": "cargo build",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": ["$rustc"],
+      "options": { "cwd": "${workspaceFolder}/app" }
+    },
+    {
+      "label": "UI: npm test",
+      "type": "shell",
+      "command": "npm ci && npm test",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}/ui", "shell": { "executable": "/bin/bash", "args": ["-c"] } }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "crateName",
+      "type": "promptString",
+      "description": "Crate name to search for (e.g. services/core-application)",
+      "default": "core"
+    },
+    {
+      "id": "testName",
+      "type": "promptString",
+      "description": "Optional test name substring (leave empty to list all)",
+      "default": ""
+    }
+  ]
+}

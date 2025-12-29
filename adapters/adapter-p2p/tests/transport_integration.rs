@@ -10,7 +10,7 @@ fn multi_peer_quic_simulation_broadcast() {
     let t2 = MockQuicTransport::new("node-2", reg.clone());
 
     // Create an event from node-0
-    let kp = KeyPair::generate();
+    let kp = KeyPair::generate().unwrap();
     let payload = "op:multi-announce".to_string();
     let sig = kp.sign(&payload);
     let ev = SignedEvent { id: "evt-q1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };

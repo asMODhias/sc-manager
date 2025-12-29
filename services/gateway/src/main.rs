@@ -33,7 +33,7 @@ async fn events_handler(
     let ev = DomainEventPayload { id: Uuid::new_v4().to_string(), kind, payload: body };
 
     // Sign and serialize
-    let signed = sign_event(&kp, &ev);
+    let signed = sign_event(&kp, &ev).map_err(|e| (axum::http::StatusCode::BAD_REQUEST, format!("sign: {}", e)))?;
     let payload = serde_json::to_vec(&signed).map_err(|e| (axum::http::StatusCode::BAD_REQUEST, format!("serialize signed: {}", e)))?;
 
     nats_client.publish(subj, &payload).await.map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e))?;
@@ -98,7 +98,7 @@ async fn main() {
                 };
                 use sc_manager_core::events::{DomainEventPayload, sign_event};
                 let ev = DomainEventPayload { id: uuid::Uuid::new_v4().to_string(), kind: subj, payload: val };
-                let signed = sign_event(&*kp, &ev);
+                let signed = sign_event(&*kp, &ev).map_err(|e| e.to_string())?;
                 let b = serde_json::to_vec(&signed).map_err(|e| e.to_string())?;
                 client.publish("domain.events", &b).await.map_err(|e| e.to_string())
             })

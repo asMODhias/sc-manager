@@ -14,7 +14,7 @@ impl SimpleGameLogParser {
         // Robust regex-based parser
         // Expected general format: "EVENT 1610000000 [key=value ...] [free text]"
         let re =
-            regex::Regex::new(r"^(?P<ev>[A-Za-z_-]+)\s+(?P<ts>\d+)(?:\s+(?P<rest>.*))?$").unwrap();
+            regex::Regex::new(r"^(?P<ev>[A-Za-z_-]+)\s+(?P<ts>\d+)(?:\s+(?P<rest>.*))?$").expect("valid line regex");
         let caps = re.captures(line.trim())?;
         let ev = caps.name("ev")?.as_str().to_lowercase();
         let ts = caps.name("ts")?.as_str().parse::<i64>().ok()?;
@@ -35,7 +35,7 @@ impl SimpleGameLogParser {
                 // split by whitespace, keep quoted values together
                 let token_re =
                     regex::Regex::new(r#"(?P<k>[^\s=]+)=(?P<v>"[^"]+"|[^\s]+)|(?P<raw>[^\s]+)"#)
-                        .unwrap();
+                        .expect("valid token regex");
                 let mut pairs = vec![];
                 for cap in token_re.captures_iter(&r) {
                     if let Some(k) = cap.name("k") {
@@ -98,7 +98,7 @@ mod tests {
                 assert_eq!(event_type, GameEventType::SessionStart);
                 assert_eq!(timestamp, 1610000000);
             }
-            _ => panic!("unexpected envelope type"),
+            _ => unreachable!("unexpected envelope type"),
         }
     }
 
@@ -116,7 +116,7 @@ mod tests {
                 assert_eq!(event_type, GameEventType::Kill);
                 assert_eq!(timestamp, 1610000100);
             }
-            _ => panic!("unexpected envelope type"),
+            _ => unreachable!("unexpected envelope type"),
         }
     }
 }

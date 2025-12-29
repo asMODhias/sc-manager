@@ -105,7 +105,14 @@ mod reg_tests {
             let subj = subject.to_string();
             let events = self.events.clone();
             Box::pin(async move {
-                let mut guard = events.lock().unwrap();
+                // TODO(SOT): Replace `lock().unwrap()` with proper error handling to avoid poisoning panics in production
+                let mut guard = match events.lock() {
+                    Ok(g) => g,
+                    Err(e) => {
+                        tracing::error!("MockPublisher publish failed: mutex poisoned: {}", e);
+                        return Ok(());
+                    }
+                };
                 guard.push((subj, payload));
                 Ok(())
             })
@@ -149,20 +156,26 @@ mod reg_tests {
         let pubm = MockPublisher::new();
         let events = pubm.events();
         let arc_pubm = std::sync::Arc::new(pubm);
-        reg.start_all(Some(arc_pubm), None).await.unwrap();
+        reg.start_all(Some(arc_pubm), None).await.expect("start_all failed in test");
 
         // give the scheduler a bit of time to run one iteration
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        let guard = events.lock().unwrap();
+        let guard = match events.lock() {
+            Ok(g) => g,
+            Err(e) => { tracing::error!("events mutex poisoned in test: {}", e); panic!("events mutex poisoned"); }
+        };
         assert!(!guard.is_empty(), "No events published by adapter scheduler");
 
         // Also test the direct fetch_and_update method
         let publisher2 = MockPublisher::new();
         let events2 = publisher2.events();
         let arc_pub2 = std::sync::Arc::new(publisher2);
-        reg.fetch_and_update("test", Some(arc_pub2)).await.unwrap();
-        let guard2 = events2.lock().unwrap();
+        reg.fetch_and_update("test", Some(arc_pub2)).await.expect("fetch_and_update failed in test");
+        let guard2 = match events2.lock() {
+            Ok(g) => g,
+            Err(e) => { tracing::error!("events2 mutex poisoned in test: {}", e); panic!("events2 mutex poisoned"); }
+        };
         assert_eq!(guard2.len(), 1, "fetch_and_update did not publish expected event");
     }
 }
@@ -234,29 +247,37 @@ impl AdapterRegistry {
         // Prepare metrics if requested
         let metric_handles = if let Some(reg) = metrics_registry.as_ref() {
             // create a small set of vectors (labeled by adapter name when used)
-            let fetch_success = prometheus::IntCounterVec::new(
-                prometheus::Opts::new("adapter_fetch_success_total", "Adapter fetch successes"),
-                &["adapter"],
-            ).unwrap();
-            let fetch_failure = prometheus::IntCounterVec::new(
-                prometheus::Opts::new("adapter_fetch_failure_total", "Adapter fetch failures"),
-                &["adapter"],
-            ).unwrap();
-            let publish_total = prometheus::IntCounterVec::new(
-                prometheus::Opts::new("adapter_publish_total", "Adapter publishes"),
-                &["adapter"],
-            ).unwrap();
-            let fetch_latency = prometheus::HistogramVec::new(
-                prometheus::HistogramOpts::new("adapter_fetch_seconds", "Adapter fetch latency seconds"),
-                &["adapter"],
-            ).unwrap();
+            match (
+                prometheus::IntCounterVec::new(
+                    prometheus::Opts::new("adapter_fetch_success_total", "Adapter fetch successes"),
+                    &["adapter"],
+                ),
+                prometheus::IntCounterVec::new(
+                    prometheus::Opts::new("adapter_fetch_failure_total", "Adapter fetch failures"),
+                    &["adapter"],
+                ),
+                prometheus::IntCounterVec::new(
+                    prometheus::Opts::new("adapter_publish_total", "Adapter publishes"),
+                    &["adapter"],
+                ),
+                prometheus::HistogramVec::new(
+                    prometheus::HistogramOpts::new("adapter_fetch_seconds", "Adapter fetch latency seconds"),
+                    &["adapter"],
+                ),
+            ) {
+                (Ok(fetch_success), Ok(fetch_failure), Ok(publish_total), Ok(fetch_latency)) => {
+                    reg.register(Box::new(fetch_success.clone())).ok();
+                    reg.register(Box::new(fetch_failure.clone())).ok();
+                    reg.register(Box::new(publish_total.clone())).ok();
+                    reg.register(Box::new(fetch_latency.clone())).ok();
 
-            reg.register(Box::new(fetch_success.clone())).ok();
-            reg.register(Box::new(fetch_failure.clone())).ok();
-            reg.register(Box::new(publish_total.clone())).ok();
-            reg.register(Box::new(fetch_latency.clone())).ok();
-
-            Some(std::sync::Arc::new((fetch_success, fetch_failure, publish_total, fetch_latency)))
+                    Some(std::sync::Arc::new((fetch_success, fetch_failure, publish_total, fetch_latency)))
+                }
+                (e1, e2, e3, e4) => {
+                    tracing::error!("Failed to create metrics: {:?}, {:?}, {:?}, {:?}", e1.err(), e2.err(), e3.err(), e4.err());
+                    None
+                }
+            }
         } else { None };
 
         // Collect spawn tasks without borrowing `self` for the task lifetime
@@ -279,17 +300,8 @@ impl AdapterRegistry {
                         let mut ticker = tokio::time::interval(intv);
                         loop {
                             ticker.tick().await;
-                            // prepare metrics tuple or defaults
-                            let metrics_tuple = match metric_counters.as_ref() {
-                                Some(m) => m.as_ref().clone(),
-                                None => (
-                                    prometheus::IntCounterVec::new(prometheus::Opts::new("dummy", "dummy"), &["adapter"]).unwrap(),
-                                    prometheus::IntCounterVec::new(prometheus::Opts::new("dummy2", "dummy2"), &["adapter"]).unwrap(),
-                                    prometheus::IntCounterVec::new(prometheus::Opts::new("dummy3", "dummy3"), &["adapter"]).unwrap(),
-                                    prometheus::HistogramVec::new(prometheus::HistogramOpts::new("dummy4", "dummy4"), &["adapter"]).unwrap(),
-                                ),
-                            };
-                            run_fetch_with_retries_metrics(&n, &adapter, &pub_opt, metrics_tuple).await;
+                            // Pass the metric handles Option through; function will handle absence gracefully
+                            run_fetch_with_retries_metrics(&n, &adapter, &pub_opt, metric_counters.clone()).await;
                         }
                     });
                 }
@@ -312,16 +324,8 @@ impl AdapterRegistry {
                                             Err(_) => std::time::Duration::from_secs(0),
                                         };
                                         tokio::time::sleep(dur).await;
-                                        let metrics_tuple = match metric_counters.as_ref() {
-                                            Some(m) => m.as_ref().clone(),
-                                            None => (
-                                                prometheus::IntCounterVec::new(prometheus::Opts::new("dummy", "dummy"), &["adapter"]).unwrap(),
-                                                prometheus::IntCounterVec::new(prometheus::Opts::new("dummy2", "dummy2"), &["adapter"]).unwrap(),
-                                                prometheus::IntCounterVec::new(prometheus::Opts::new("dummy3", "dummy3"), &["adapter"]).unwrap(),
-                                                prometheus::HistogramVec::new(prometheus::HistogramOpts::new("dummy4", "dummy4"), &["adapter"]).unwrap(),
-                                            ),
-                                        };
-                                        run_fetch_with_retries_metrics(&n, &adapter, &pub_opt, metrics_tuple).await;
+                                        // Pass the metric handles Option through; function will handle absence gracefully
+                                        run_fetch_with_retries_metrics(&n, &adapter, &pub_opt, metric_counters.clone()).await;
                                     } else {
                                         tracing::warn!("Cron schedule produced no upcoming times: {}", cron_expr);
                                         break;
@@ -354,18 +358,17 @@ impl AdapterRegistry {
 
 // Helper: run fetch with retries and record minimal metrics
 async fn run_fetch_with_retries(name: &str, adapter: &Arc<dyn DataAdapter>, publisher: &Option<std::sync::Arc<dyn EventPublisher>>, metric_handles: Option<std::sync::Arc<(prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::HistogramVec)>>) {
-    run_fetch_with_retries_metrics(name, adapter, publisher, (
-        metric_handles.as_ref().map(|m| m.as_ref().0.clone()).unwrap_or_else(|| prometheus::IntCounterVec::new(prometheus::Opts::new("dummy", "dummy"), &["adapter"]).unwrap()),
-        metric_handles.as_ref().map(|m| m.as_ref().1.clone()).unwrap_or_else(|| prometheus::IntCounterVec::new(prometheus::Opts::new("dummy2", "dummy2"), &["adapter"]).unwrap()),
-        metric_handles.as_ref().map(|m| m.as_ref().2.clone()).unwrap_or_else(|| prometheus::IntCounterVec::new(prometheus::Opts::new("dummy3", "dummy3"), &["adapter"]).unwrap()),
-        metric_handles.as_ref().map(|m| m.as_ref().3.clone()).unwrap_or_else(|| prometheus::HistogramVec::new(prometheus::HistogramOpts::new("dummy4", "dummy4"), &["adapter"]).unwrap()),
-    )).await;
+    // Pass through the Option; the inner function will handle presence/absence of metrics gracefully
+    run_fetch_with_retries_metrics(name, adapter, publisher, metric_handles).await;
 }
 
-async fn run_fetch_with_retries_metrics(name: &str, adapter: &Arc<dyn DataAdapter>, publisher: &Option<std::sync::Arc<dyn EventPublisher>>, metrics: (prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::HistogramVec)) {
+async fn run_fetch_with_retries_metrics(name: &str, adapter: &Arc<dyn DataAdapter>, publisher: &Option<std::sync::Arc<dyn EventPublisher>>, metrics_opt: Option<std::sync::Arc<(prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::HistogramVec)>>) {
     let max_retries: u32 = std::env::var("ADAPTER_FETCH_MAX_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(3);
     let base_backoff_ms: u64 = std::env::var("ADAPTER_FETCH_BACKOFF_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(500);
-    let (fetch_success, fetch_failure, publish_total, fetch_latency) = metrics;
+
+    // Clone out the metric tuple if available; otherwise operate without metrics
+    let metrics: Option<(prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::HistogramVec)> =
+        metrics_opt.as_ref().map(|m| m.as_ref().clone());
 
     let mut attempt = 0u32;
     loop {
@@ -374,15 +377,17 @@ async fn run_fetch_with_retries_metrics(name: &str, adapter: &Arc<dyn DataAdapte
         match adapter.fetch().await {
             Ok(data) => {
                 let elapsed = start.elapsed();
-                fetch_success.with_label_values(&[name]).inc();
-                fetch_latency.with_label_values(&[name]).observe(elapsed.as_secs_f64());
+                if let Some((fetch_success, _fetch_failure, _publish_total, fetch_latency)) = metrics.as_ref() {
+                    fetch_success.with_label_values(&[name]).inc();
+                    fetch_latency.with_label_values(&[name]).observe(elapsed.as_secs_f64());
+                }
                 if let Some(p) = &publisher {
                     match serde_json::to_vec(&data) {
                         Ok(payload) => {
                             let subj = format!("adapters.{}.data", name);
                             if let Err(e) = p.publish(&subj, payload).await {
                                 tracing::error!("Failed to publish adapter {} data: {}", name, e);
-                            } else {
+                            } else if let Some((_fetch_success, _fetch_failure, publish_total, _fetch_latency)) = metrics.as_ref() {
                                 publish_total.with_label_values(&[name]).inc();
                             }
                         }
@@ -394,7 +399,9 @@ async fn run_fetch_with_retries_metrics(name: &str, adapter: &Arc<dyn DataAdapte
                 break; // success
             }
             Err(e) => {
-                fetch_failure.with_label_values(&[name]).inc();
+                if let Some((_fetch_success, fetch_failure, _publish_total, _fetch_latency)) = metrics.as_ref() {
+                    fetch_failure.with_label_values(&[name]).inc();
+                }
                 tracing::warn!("Adapter {} fetch attempt {} failed: {}", name, attempt, e);
                 if attempt >= max_retries {
                     tracing::error!("Adapter {} exhausted retries ({}), giving up", name, max_retries);

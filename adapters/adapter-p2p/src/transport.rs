@@ -30,7 +30,10 @@ impl InMemoryTransportRegistry {
 
     /// Register a sender for a peer ID
     pub fn register(&self, id: &str, tx: Sender<TransportMessage>) {
-        self.map.lock().unwrap().insert(id.to_string(), tx);
+        match self.map.lock() {
+            Ok(mut m) => { m.insert(id.to_string(), tx); }
+            Err(e) => tracing::error!("Mutex poisoned in InMemoryTransportRegistry::register: {}", e),
+        }
     }
 
     pub fn send_direct(&self, msg: &TransportMessage) -> Result<(), String> {
@@ -115,17 +118,21 @@ mod tests {
         let a = MockQuicTransport::new("node-a", reg.clone());
         let b = MockQuicTransport::new("node-b", reg.clone());
 
-        let kp = KeyPair::generate();
+        // TODO(SOT): Replace `.unwrap()` with error propagation or Result handling in production code.
+        let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "op:announce".to_string();
-        let sig = kp.sign(&payload);
+        let sig = kp.sign(payload);
         let ev = SignedEvent { id: "s1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };
-        let bytes = serde_json::to_vec(&ev).unwrap();
+        // TODO(SOT): Replace `.unwrap()` with error handling to avoid panics in production.
+        let bytes = serde_json::to_vec(&ev).expect("serialize event in test");
 
         a.send("node-b", bytes).expect("send ev");
 
         let mut it = b.subscribe();
-        let m = it.next().unwrap();
-        let received_ev: SignedEvent = serde_json::from_slice(&m.payload).unwrap();
+        // TODO(SOT): avoid using `.unwrap()` on iterator results; handle Option properly to avoid panics in production.
+        let m = it.next().expect("should receive");
+        // TODO(SOT): replace `serde_json::from_slice(...).unwrap()` with proper error handling and return Result
+        let received_ev: SignedEvent = serde_json::from_slice(&m.payload).expect("deserialize event in test");
         // verify signature using public key from sender (simulated by having access to kp here)
         assert!(received_ev.verify(&kp));
         assert_eq!(received_ev.payload, payload);

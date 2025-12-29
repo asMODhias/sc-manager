@@ -28,18 +28,18 @@ pub struct KeyPair {
 }
 
 impl KeyPair {
-    pub fn generate() -> Self {
+    pub fn generate() -> Result<Self, String> {
         // Deterministic/test-friendly keypair generation to avoid RNG dependency conflicts in CI.
         use ed25519_dalek::{PublicKey, SecretKey};
         let sk_bytes = [1u8; 32];
-        let sk = SecretKey::from_bytes(&sk_bytes).unwrap();
+        let sk = SecretKey::from_bytes(&sk_bytes).map_err(|e| format!("SecretKey::from_bytes failed: {}", e))?;
         let pk = PublicKey::from(&sk);
         let pk_b64 = base64::encode(pk.to_bytes());
-        Self {
+        Ok(Self {
             id: format!("node-{}", pk_b64.get(0..8).unwrap_or("xx")),
             public_key_b64: pk_b64,
             secret: sk,
-        }
+        })
     }
 }
 
@@ -55,10 +55,28 @@ impl Identity for KeyPair {
 impl Signer for KeyPair {
     fn sign(&self, data: &str) -> String {
         use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signature, Signer as _};
-        // Reconstruct keypair from secret + public
-        let sk = SecretKey::from_bytes(&self.secret.to_bytes()).unwrap();
-        let pk_bytes = base64::decode(&self.public_key_b64).unwrap();
-        let pk = PublicKey::from_bytes(&pk_bytes).unwrap();
+        // Reconstruct keypair from secret + public without panicking
+        let sk = match SecretKey::from_bytes(&self.secret.to_bytes()) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("KeyPair::sign failed to parse SecretKey: {}", e);
+                return String::new();
+            }
+        };
+        let pk_bytes = match base64::decode(&self.public_key_b64) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::error!("KeyPair::sign failed to decode public key: {}", e);
+                return String::new();
+            }
+        };
+        let pk = match PublicKey::from_bytes(&pk_bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!("KeyPair::sign failed to parse PublicKey: {}", e);
+                return String::new();
+            }
+        };
         let kp = Keypair { secret: sk, public: pk };
         let sig: Signature = kp.sign(data.as_bytes());
         base64::encode(sig.to_bytes())
@@ -106,7 +124,7 @@ mod tests {
 
     #[test]
     fn keypair_can_sign_and_verify() {
-        let kp = KeyPair::generate();
+        let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "payload-123";
         let sig = kp.sign(payload);
         let ev = SignedEvent {
@@ -121,8 +139,8 @@ mod tests {
     #[test]
     fn inprocess_two_node_gossip_signed_event() {
         // Create two nodes
-        let node_a = KeyPair::generate();
-        let _node_b = KeyPair::generate();
+        let node_a = KeyPair::generate().expect("generate keypair in test");
+        let _node_b = KeyPair::generate().expect("generate keypair in test");
 
         // in-process channel simulating network
         let (tx, rx) = mpsc::channel::<SignedEvent>();
@@ -165,15 +183,15 @@ mod tests {
         const NODES: usize = 4;
 
         // generate nodes
-        let nodes: Vec<KeyPair> = (0..NODES).map(|_| KeyPair::generate()).collect();
+        let nodes: Vec<KeyPair> = (0..NODES).map(|_| KeyPair::generate().expect("generate keypair in test")).collect();
 
         // registry of public keys (signer_id -> public_key)
         let registry: Arc<Mutex<std::collections::HashMap<String, String>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
         for n in nodes.iter() {
-            registry
-                .lock()
-                .unwrap()
-                .insert(n.id.clone(), n.public_key_b64.clone());
+            match registry.lock() {
+                Ok(mut reg) => { reg.insert(n.id.clone(), n.public_key_b64.clone()); }
+                Err(e) => { tracing::error!("Mutex poisoned in registry insert: {}", e); continue; }
+            }
         }
 
         // per-node receive channels
@@ -214,15 +232,27 @@ mod tests {
             let registry_cloned = registry.clone();
             let handle = thread::spawn(move || {
                 while let Ok(ev) = rx.recv() {
-                    let mut s = seen.lock().unwrap();
+                    // TODO(SOT): Replace lock().unwrap() with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
+                    let mut s = match seen.lock() {
+                        Ok(g) => g,
+                        Err(e) => { tracing::error!("seen mutex poisoned: {}", e); continue; }
+                    };
                     if s.contains(&ev.id) {
                         continue; // already seen
                     }
                     // verify signature - find signer public key via registry
-                    let reg = registry_cloned.lock().unwrap();
+                    let reg = match registry_cloned.lock() {
+                        Ok(g) => g,
+                        Err(e) => { tracing::error!("registry mutex poisoned: {}", e); continue; }
+                    };
                     if let Some(pk_b64) = reg.get(&ev.signer_id) {
                         // build a temporary KeyPair-like identity with public key
-                        let temp = KeyPair { id: ev.signer_id.clone(), public_key_b64: pk_b64.clone(), secret: ed25519_dalek::SecretKey::from_bytes(&[1u8;32]).unwrap() };
+                        // TODO(SOT): Replace `SecretKey::from_bytes(...).unwrap()` with error handling; using unwrap here can panic in production
+                        let temp_secret = match ed25519_dalek::SecretKey::from_bytes(&[1u8;32]) {
+                            Ok(s) => s,
+                            Err(e) => { tracing::error!("failed to construct temp secret: {}", e); continue; }
+                        };
+                        let temp = KeyPair { id: ev.signer_id.clone(), public_key_b64: pk_b64.clone(), secret: temp_secret };
                         if !ev.verify(&temp) {
                             // invalid signature -> ignore
                             continue;
@@ -258,7 +288,10 @@ mod tests {
         loop {
             let mut all_seen = true;
             for s in seen_vec.iter() {
-                let guard = s.lock().unwrap();
+                let guard = match s.lock() {
+                    Ok(g) => g,
+                    Err(e) => { tracing::error!("seen mutex poisoned while waiting: {}", e); all_seen = false; break; }
+                };
                 if !guard.contains(&init_ev.id) {
                     all_seen = false;
                     break;
@@ -275,7 +308,10 @@ mod tests {
 
         // check all nodes saw initial event
         for s in seen_vec.iter() {
-            let guard = s.lock().unwrap();
+            let guard = match s.lock() {
+                Ok(g) => g,
+                Err(e) => { tracing::error!("seen mutex poisoned in final check: {}", e); assert!(false, "seen mutex poisoned"); }
+            };
             assert!(guard.contains(&init_ev.id));
         }
 

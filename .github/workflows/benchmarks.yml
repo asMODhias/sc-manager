@@ -1,0 +1,30 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch: {}
+
+jobs:
+  run-benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run benches
+        run: |
+          chmod +x scripts/run-benchmarks.sh
+          ./scripts/run-benchmarks.sh
+      - name: Upload criterion artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-results
+          path: core/target/criterion || true

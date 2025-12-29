@@ -21,13 +21,19 @@ impl InMemoryDht {
 
 impl DhtRegistry for InMemoryDht {
     fn announce(&self, id: &str, public_key_b64: &str) {
-        self.map.lock().unwrap().insert(id.to_string(), public_key_b64.to_string());
+        match self.map.lock() {
+            Ok(mut m) => { m.insert(id.to_string(), public_key_b64.to_string()); }
+            Err(e) => { tracing::error!("InMemoryDht announce: mutex poisoned: {}", e); }
+        }
     }
 
     fn lookup(&self, id: &str) -> Option<String> {
-        self.map.lock().unwrap().get(id).cloned()
+        match self.map.lock() {
+            Ok(m) => m.get(id).cloned(),
+            Err(e) => { tracing::error!("InMemoryDht lookup: mutex poisoned: {}", e); None }
+        }
     }
-}
+} 
 
 #[cfg(test)]
 mod tests {
