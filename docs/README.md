@@ -7,6 +7,8 @@ This documentation environment is intentionally minimal and *authoritative files
 
 All documentation in this repo should be derived from and conform to those two files. Any other documentation is intentionally removed to avoid drift.
 
+A GitHub Action enforces that only the above files (plus `index.md` and `README.md`) exist under `docs/`. Any additional file will fail the docs authority check.
+
 Local preview (requires mkdocs):
 
 1. Install: `pip install mkdocs mkdocs-material` (or use your preferred static site generator)
