@@ -1063,7 +1063,7 @@ macro_rules! opt_res (
 /// # use nom::IResult;
 /// # fn main() {
 ///  let b = true;
-///  let f: Box<Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
+///  let f: Box<dyn Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
 ///    cond!( b, tag!("abcd") ))
 ///  );
 ///
@@ -1071,7 +1071,7 @@ macro_rules! opt_res (
 ///  assert_eq!(f(&a[..]), Ok((&b"ef"[..], Some(&b"abcd"[..]))));
 ///
 ///  let b2 = false;
-///  let f2:Box<Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
+///  let f2:Box<dyn Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
 ///    cond!( b2, tag!("abcd") ))
 ///  );
 ///  assert_eq!(f2(&a[..]), Ok((&b"abcdef"[..], None)));
@@ -1117,7 +1117,7 @@ macro_rules! cond_with_error(
 /// # use nom::IResult;
 /// # fn main() {
 ///  let b = true;
-///  let f: Box<Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
+///  let f: Box<dyn Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
 ///    cond!( b, tag!("abcd") ))
 ///  );
 ///
@@ -1125,7 +1125,7 @@ macro_rules! cond_with_error(
 ///  assert_eq!(f(&a[..]), Ok((&b"ef"[..], Some(&b"abcd"[..]))));
 ///
 ///  let b2 = false;
-///  let f2:Box<Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
+///  let f2:Box<dyn Fn(&'static [u8]) -> IResult<&[u8],Option<&[u8]>>> = Box::new(closure!(&'static[u8],
 ///    cond!( b2, tag!("abcd") ))
 ///  );
 ///  assert_eq!(f2(&a[..]), Ok((&b"abcdef"[..], None)));
@@ -1562,11 +1562,11 @@ mod tests {
   #[test]
   #[cfg(feature = "alloc")]
   fn cond() {
-    let f_true: Box<Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
+    let f_true: Box<dyn Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
       &'static [u8],
       fix_error!(CustomError, cond!(true, tag!("abcd")))
     ));
-    let f_false: Box<Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
+    let f_false: Box<dyn Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
       &'static [u8],
       fix_error!(CustomError, cond!(false, tag!("abcd")))
     ));
@@ -1586,11 +1586,11 @@ mod tests {
   fn cond_wrapping() {
     // Test that cond!() will wrap a given identifier in the call!() macro.
     named!(tag_abcd, tag!("abcd"));
-    let f_true: Box<Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
+    let f_true: Box<dyn Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
       &'static [u8],
       fix_error!(CustomError, cond!(true, tag_abcd))
     ));
-    let f_false: Box<Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
+    let f_false: Box<dyn Fn(&'static [u8]) -> IResult<&[u8], Option<&[u8]>, CustomError>> = Box::new(closure!(
       &'static [u8],
       fix_error!(CustomError, cond!(false, tag_abcd))
     ));
