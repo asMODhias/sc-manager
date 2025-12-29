@@ -36,6 +36,14 @@
       "group": { "kind": "test", "isDefault": false }
     },
     {
+      "label": "Local CI (status)",
+      "type": "shell",
+      "command": "./scripts/run-local-ci-status.sh",
+      "presentation": { "reveal": "always" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": false }
+    },
+    {
       "label": "Build Images",
       "type": "shell",
       "command": "bash -lc './scripts/build-images.sh'",
