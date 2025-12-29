@@ -1,0 +1,16 @@
+{
+  "name": "SC Manager Devcontainer",
+  "image": "mcr.microsoft.com/vscode/devcontainers/rust:1-ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker": {}
+  },
+  "postCreateCommand": "echo 'Devcontainer ready. Installing act (if missing) and finishing setup...' && (command -v act >/dev/null 2>&1 || (apt-get update && apt-get install -y curl && curl -sL https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash)) || true","}
+  "customizations": {
+    "vscode": {
+      "extensions": ["rust-lang.rust-analyzer", "ms-vscode.js-debug", "esbenp.prettier-vscode", "ms-azuretools.vscode-docker"]
+    }
+  }
+}

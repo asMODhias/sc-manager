@@ -20,6 +20,8 @@ We provide a local script and VS Code tasks to run the same checks as the GitHub
 There are tasks defined in `tasks.json`/workspace (if provided):
 - `Local CI (PowerShell)` — runs PowerShell local CI script
 - `Local CI (Bash)` — runs Bash local CI script
+- **New:** `Local CI (fast)` — runs the fast local script (`./scripts/run-local-ci.sh`).
+- **New:** `Local GH Actions (act)` — runs the GitHub Actions `local-ci` job locally via `act` using `./scripts/run-gh-actions-local.sh`. See below for `act` usage and prerequisites.
 
 ## Notes
 - The local scripts aim to mirror the GitHub Actions workflow but may skip some CI-only steps (e.g., certain secrets, docker builds).
