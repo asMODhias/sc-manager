@@ -254,7 +254,7 @@ impl Schedule {
 
     /// Provides an iterator which will return each DateTime that matches the schedule starting with
     /// the current time if applicable.
-    pub fn upcoming<Z>(&self, timezone: Z) -> ScheduleIterator<Z>
+    pub fn upcoming<Z>(&self, timezone: Z) -> ScheduleIterator<'_, Z>
     where
         Z: TimeZone,
     {

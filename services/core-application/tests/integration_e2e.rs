@@ -4,10 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 fn run_if_integration_enabled() -> bool {
-    match env::var("RUN_INTEGRATION_TESTS") {
-        Ok(v) if v == "1" => true,
-        _ => false,
-    }
+    matches!(env::var("RUN_INTEGRATION_TESTS"), Ok(v) if v == "1")
 }
 
 #[test]
@@ -48,7 +45,7 @@ fn nats_to_postgres_end_to_end() {
 
         loop {
             match s.read(&mut buf) {
-                Ok(n) if n == 0 => break,
+                Ok(0) => break,
                 Ok(n) => {
                     accumulated.extend_from_slice(&buf[..n]);
                     if let Ok(text) = std::str::from_utf8(&accumulated) {
@@ -118,8 +115,7 @@ fn nats_to_postgres_end_to_end() {
     ps.write_all(pub_cmd.as_bytes()).unwrap();
 
     // wait for subscriber signal
-    let ok = rx.recv_timeout(std::time::Duration::from_secs(10)).expect("subscriber should signal");
-    drop(ok);
+    rx.recv_timeout(std::time::Duration::from_secs(10)).expect("subscriber should signal");
 
     // Verify DB contains the row
     let mut client = postgres::Client::connect(&db_url, postgres::NoTls).expect("connect db main");

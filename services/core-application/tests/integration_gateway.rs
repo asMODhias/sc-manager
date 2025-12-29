@@ -4,10 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 fn run_if_integration_enabled() -> bool {
-    match env::var("RUN_INTEGRATION_TESTS") {
-        Ok(v) if v == "1" => true,
-        _ => false,
-    }
+    matches!(env::var("RUN_INTEGRATION_TESTS"), Ok(v) if v == "1")
 }
 
 #[test]
@@ -47,7 +44,7 @@ fn gateway_pub_to_nats_writes_db() {
 
         loop {
             match s.read(&mut buf) {
-                Ok(n) if n == 0 => break,
+                Ok(0) => break,
                 Ok(n) => {
                     accumulated.extend_from_slice(&buf[..n]);
                     if let Ok(text) = std::str::from_utf8(&accumulated) {

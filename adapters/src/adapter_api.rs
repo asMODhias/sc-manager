@@ -163,7 +163,7 @@ mod reg_tests {
 
         let guard = match events.lock() {
             Ok(g) => g,
-            Err(e) => { tracing::error!("events mutex poisoned in test: {}", e); assert!(false, "events mutex poisoned"); }
+            Err(e) => { tracing::error!("events mutex poisoned in test: {}", e); panic!("events mutex poisoned"); }
         }; 
         assert!(!guard.is_empty(), "No events published by adapter scheduler");
 
@@ -174,7 +174,7 @@ mod reg_tests {
         reg.fetch_and_update("test", Some(arc_pub2)).await.expect("fetch_and_update failed in test");
         let guard2 = match events2.lock() {
             Ok(g) => g,
-            Err(e) => { tracing::error!("events2 mutex poisoned in test: {}", e); assert!(false, "events2 mutex poisoned"); }
+            Err(e) => { tracing::error!("events2 mutex poisoned in test: {}", e); panic!("events2 mutex poisoned"); }
         }; 
         assert_eq!(guard2.len(), 1, "fetch_and_update did not publish expected event");
     }
@@ -357,6 +357,7 @@ impl AdapterRegistry {
 }
 
 // Helper: run fetch with retries and record minimal metrics
+#[allow(dead_code)]
 async fn run_fetch_with_retries(name: &str, adapter: &Arc<dyn DataAdapter>, publisher: &Option<std::sync::Arc<dyn EventPublisher>>, metric_handles: Option<std::sync::Arc<(prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::HistogramVec)>>) {
     // Pass through the Option; the inner function will handle presence/absence of metrics gracefully
     run_fetch_with_retries_metrics(name, adapter, publisher, metric_handles).await;

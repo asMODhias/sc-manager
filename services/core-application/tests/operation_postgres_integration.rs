@@ -38,7 +38,7 @@ fn operation_to_postgres_e2e() {
 
         loop {
             match s.read(&mut buf) {
-                Ok(n) if n == 0 => break,
+                Ok(0) => break,
                 Ok(n) => {
                     accumulated.extend_from_slice(&buf[..n]);
                     if let Ok(text) = std::str::from_utf8(&accumulated) {
@@ -50,6 +50,9 @@ fn operation_to_postgres_e2e() {
                                     let header = &text[msg_pos..header_end];
                                     let parts: Vec<&str> = header.split_whitespace().collect();
                                     if parts.len() >= 4 {
+                                        if let Ok(0) = parts[3].parse::<usize>() {
+                                            break;
+                                        }
                                         if let Ok(len) = parts[3].parse::<usize>() {
                                             let payload_start = header_end + 2;
                                             let needed = payload_start + len + 2;
@@ -95,7 +98,7 @@ fn operation_to_postgres_e2e() {
     ps.write_all(pub_cmd.as_bytes()).unwrap();
 
     // wait for subscriber
-    let _ = rx.recv_timeout(std::time::Duration::from_secs(10)).expect("subscriber should signal");
+    rx.recv_timeout(std::time::Duration::from_secs(10)).expect("subscriber should signal");
 
     // verify DB
     let mut client = postgres::Client::connect(&db_url, postgres::NoTls).expect("connect db main");

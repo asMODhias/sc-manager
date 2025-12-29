@@ -37,7 +37,7 @@
 //!     (Color { red, green, blue })
 //!   )
 //! );
-//!
+#![allow(unused_imports)]
 //! fn main() {
 //!   assert_eq!(hex_color("#2F14DF"), Ok(("", Color {
 //!     red: 47,
@@ -405,6 +405,7 @@ pub use self::verbose_errors::*;
 #[cfg(not(feature = "verbose-errors"))]
 pub use self::simple_errors::*;
 
+#[allow(unused_imports)]
 pub use self::branch::*;
 pub use self::internal::*;
 pub use self::macros::*;

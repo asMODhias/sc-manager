@@ -1,11 +1,8 @@
 use std::env;
-use std::io::{Read, Write};
+use std::io::Write;
 
 fn run_if_integration_enabled() -> bool {
-    match env::var("RUN_INTEGRATION_TESTS") {
-        Ok(v) if v == "1" => true,
-        _ => false,
-    }
+    matches!(env::var("RUN_INTEGRATION_TESTS"), Ok(v) if v == "1")
 }
 
 #[test]
