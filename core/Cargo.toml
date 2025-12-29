@@ -13,3 +13,4 @@ thiserror = "1.0"
 
 [dev-dependencies]
 # Add test helpers here
+criterion = "0.4"
