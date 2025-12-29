@@ -1,0 +1,17 @@
+site_name: "SC Manager Docs"
+docs_dir: docs
+site_dir: site
+nav:
+  - Home: index.md
+  - Foundation: SC_MANAGER_V7_PART1_FOUNDATION.md
+  - Feature Matrix: SC_MANAGER_V7_FEATURE_MATRIX_AND_COMPLETION.md
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
