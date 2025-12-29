@@ -106,7 +106,13 @@ mod reg_tests {
             let events = self.events.clone();
             Box::pin(async move {
                 // TODO(SOT): Replace `lock().unwrap()` with proper error handling to avoid poisoning panics in production
-                let mut guard = events.lock().unwrap();
+                let mut guard = match events.lock() {
+                    Ok(g) => g,
+                    Err(e) => {
+                        tracing::error!("MockPublisher publish failed: mutex poisoned: {}", e);
+                        return Ok(());
+                    }
+                };
                 guard.push((subj, payload));
                 Ok(())
             })

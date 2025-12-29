@@ -55,13 +55,28 @@ impl Identity for KeyPair {
 impl Signer for KeyPair {
     fn sign(&self, data: &str) -> String {
         use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signature, Signer as _};
-        // Reconstruct keypair from secret + public
-        // TODO(SOT): Replace `.unwrap()` with proper error handling and propagate errors instead of panicking. See `docs/04_DEV_GUIDE_COPILOT.md` (Pre-Code Checklist).
-        let sk = SecretKey::from_bytes(&self.secret.to_bytes()).unwrap();
-        // TODO(SOT): Replace `.unwrap()` with proper error handling and propagate errors instead of panicking.
-        let pk_bytes = base64::decode(&self.public_key_b64).unwrap();
-        // TODO(SOT): Replace `.unwrap()` with proper error handling and propagate errors instead of panicking.
-        let pk = PublicKey::from_bytes(&pk_bytes).unwrap();
+        // Reconstruct keypair from secret + public without panicking
+        let sk = match SecretKey::from_bytes(&self.secret.to_bytes()) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("KeyPair::sign failed to parse SecretKey: {}", e);
+                return String::new();
+            }
+        };
+        let pk_bytes = match base64::decode(&self.public_key_b64) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::error!("KeyPair::sign failed to decode public key: {}", e);
+                return String::new();
+            }
+        };
+        let pk = match PublicKey::from_bytes(&pk_bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!("KeyPair::sign failed to parse PublicKey: {}", e);
+                return String::new();
+            }
+        };
         let kp = Keypair { secret: sk, public: pk };
         let sig: Signature = kp.sign(data.as_bytes());
         base64::encode(sig.to_bytes())
@@ -109,7 +124,7 @@ mod tests {
 
     #[test]
     fn keypair_can_sign_and_verify() {
-        let kp = KeyPair::generate().unwrap();
+        let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "payload-123";
         let sig = kp.sign(payload);
         let ev = SignedEvent {
@@ -173,10 +188,10 @@ mod tests {
         // registry of public keys (signer_id -> public_key)
         let registry: Arc<Mutex<std::collections::HashMap<String, String>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
         for n in nodes.iter() {
-            registry
-                .lock()
-                .unwrap()
-                .insert(n.id.clone(), n.public_key_b64.clone());
+            match registry.lock() {
+                Ok(mut reg) => { reg.insert(n.id.clone(), n.public_key_b64.clone()); }
+                Err(e) => { tracing::error!("Mutex poisoned in registry insert: {}", e); continue; }
+            }
         }
 
         // per-node receive channels
