@@ -1,0 +1,15 @@
+[package]
+name = "sc_manager_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sc_manager_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+# Add test helpers here

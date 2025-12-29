@@ -1,0 +1,47 @@
+[package]
+name = "sc_manager_gateway"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+# Feature to enable building/running the gateway binary locally
+run_server = []
+
+[dependencies]
+async-graphql = "5"
+serde = { version = "1.0", features = ["derive"] }
+sc_manager_core = { path = "../core-domain" }
+axum = "0.7"
+axum-server = "0.8"
+
+# cryptography used to sign events from the gateway
+ed25519-dalek = "1.0"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "net"] }
+url = "2"
+hyper = { version = "1", features = ["full"] } # align with axum's hyper dependency (1.x)
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
+base64 = "0.21"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Utilities used in tests
+tower = "0.5"
+
+# Metrics
+prometheus = "0.14"
+
+# Use an async NATS client instead of raw TCP for correctness
+async-nats = "0.34"
+sc_manager_adapters = { path = "../../adapters" }
+
+# No dev http client required for gateway tests; remove reqwest to avoid hyper <-> hyper 1.x conflicts
+# reqwest = { version = "0.11", features = ["blocking", "json"] }
+
+[[bin]]
+name = "sc_manager_gateway"
+path = "src/main.rs"
