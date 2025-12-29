@@ -1,0 +1,22 @@
+name: Dev Guide Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-dev-guide:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Git
+        run: |
+          git fetch --no-tags --prune --unshallow || true
+      - name: Make script executable
+        run: chmod +x scripts/check-dev-guide.sh
+      - name: Run dev guide checks
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: ./scripts/check-dev-guide.sh
