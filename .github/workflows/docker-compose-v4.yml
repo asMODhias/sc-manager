@@ -1,0 +1,52 @@
+name: Docker Compose V4 Integration
+
+on:
+  push:
+    paths:
+      - 'docker/**'
+      - 'services/**'
+      - 'infrastructure/**'
+  pull_request:
+    paths:
+      - 'docker/**'
+      - 'services/**'
+      - 'infrastructure/**'
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Start integration stack (detached)
+        run: |
+          docker compose -f docker/docker-compose.v4.yml up --build -d
+      - name: Wait for services readiness
+        run: |
+          # wait for NATS TCP
+          for i in $(seq 1 60); do
+            if nc -z localhost 4222; then echo "nats ok"; break; fi
+            echo "waiting for nats... ($i/60)"; sleep 2
+          done
+          # wait for Postgres TCP
+          for i in $(seq 1 60); do
+            if nc -z localhost 5432; then echo "postgres ok"; break; fi
+            echo "waiting for postgres... ($i/60)"; sleep 2
+          done
+          # wait for gateway HTTP health
+          for i in $(seq 1 60); do
+            if curl -sSf http://localhost:8080/health >/dev/null 2>&1; then echo "gateway ok"; break; fi
+            echo "waiting for gateway... ($i/60)"; sleep 2
+          done
+      - name: Run integration tests inside integration container
+        run: |
+          docker compose -f docker/docker-compose.v4.yml run --rm integration
+      - name: Save logs
+        if: failure()
+        run: |
+          docker compose -f docker/docker-compose.v4.yml logs > integration-logs.txt || true
+      - name: Teardown stack
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.v4.yml down --volumes

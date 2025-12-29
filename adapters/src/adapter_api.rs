@@ -105,7 +105,8 @@ mod reg_tests {
             let subj = subject.to_string();
             let events = self.events.clone();
             Box::pin(async move {
-                // TODO(SOT): Replace lock usage with proper error handling to avoid poisoning panics in production
+                // TODO(SOT) [TRACKED-002]: Replace lock usage with proper error handling to avoid poisoning panics in production
+                // See docs/TRACKED_TODOS.md#TRACKED-002
                 let mut guard = match events.lock() {
                     Ok(g) => g,
                     Err(e) => {

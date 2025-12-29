@@ -1,0 +1,42 @@
+name: Spec Validation
+
+on:
+  pull_request:
+
+jobs:
+  validate-spec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure ULTIMATE_V3.md exists and has header
+        run: |
+          if [ ! -f docs/ULTIMATE_V3.md ]; then
+            echo "Missing docs/ULTIMATE_V3.md"; exit 1
+          fi
+          if ! grep -q "ULTIMATE COPILOT INSTRUCTION" docs/ULTIMATE_V3.md; then
+            echo "docs/ULTIMATE_V3.md header not found or incorrect"; exit 1
+          fi
+
+      - name: Ensure SC_MANAGER_MASTER_SPEC.md is deprecated
+        run: |
+          if [ ! -f SC_MANAGER_MASTER_SPEC.md ]; then
+            echo "SC_MANAGER_MASTER_SPEC.md missing (expected deprecated copy)"; exit 1
+          fi
+          if ! grep -q "DEPRECATED" SC_MANAGER_MASTER_SPEC.md; then
+            echo "SC_MANAGER_MASTER_SPEC.md should be marked DEPRECATED and point to docs/ULTIMATE_V3.md"; exit 1
+          fi
+
+      - name: Run adapters registry validation
+        working-directory: ./adapters
+        run: |
+          cargo test --lib --tests --verbose
+
+      - name: Ensure HUB_POLICY.md exists
+        run: |
+          if [ ! -f docs/HUB_POLICY.md ] && [ ! -f docs/data_hub_policy.md ]; then
+            echo "Missing HUB_POLICY.md"; exit 1
+          fi
+          echo HUB_POLICY ok
+

@@ -65,8 +65,8 @@ impl KeyPair {
 }
 
 /// Deterministic test keypair (for CI/testing only)
-pub fn generate_test_keypair() -> KeyPair {
-    KeyPair::generate().expect("generate test keypair")
+pub fn generate_test_keypair() -> Result<KeyPair, String> {
+    KeyPair::generate()
 }
 
 /// Sign a DomainEventPayload

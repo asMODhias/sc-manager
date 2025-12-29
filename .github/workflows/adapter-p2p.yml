@@ -1,0 +1,22 @@
+name: Adapter — P2P CI
+
+on:
+  push:
+    paths:
+      - 'adapters/adapter-p2p/**'
+  pull_request:
+    paths:
+      - 'adapters/adapter-p2p/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Run adapter-p2p tests
+        run: cargo test --manifest-path adapters/adapter-p2p/Cargo.toml --quiet

@@ -118,12 +118,14 @@ mod tests {
         let a = MockQuicTransport::new("node-a", reg.clone());
         let b = MockQuicTransport::new("node-b", reg.clone());
 
-        // TODO(SOT): Replace unwrap-style usage with explicit error propagation or Result handling in production code.
+        // TODO(SOT) [TRACKED-001]: Replace unwrap-style usage with explicit error propagation or Result handling in production code.
+        // See docs/TRACKED_TODOS.md#TRACKED-001
         let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "op:announce".to_string();
         let sig = kp.sign(payload);
         let ev = SignedEvent { id: "s1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };
-        // TODO(SOT): Replace unwrap-style usage with proper error handling to avoid panics in production.
+        // TODO(SOT) [TRACKED-001]: Replace unwrap-style usage with proper error handling to avoid panics in production.
+        // See docs/TRACKED_TODOS.md#TRACKED-001
         let bytes = serde_json::to_vec(&ev).expect("serialize event in test");
 
         a.send("node-b", bytes).expect("send ev");

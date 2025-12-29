@@ -58,7 +58,10 @@ async fn main() {
         Ok(a) => a,
         Err(e) => {
             tracing::error!("Invalid GATEWAY_BIND '{}': {}. Falling back to 0.0.0.0:8080", bind, e);
-            "0.0.0.0:8080".parse().expect("default bind is a valid socket address")
+            match "0.0.0.0:8080".parse() {
+                Ok(a) => a,
+                Err(e) => { eprintln!("Critical: default bind failed to parse: {}", e); std::process::exit(1); }
+            }
         }
     };
     info!("Gateway running on {}", addr);
@@ -116,7 +119,10 @@ async fn main() {
     let metrics_registry = prometheus::Registry::new();
 
     let publisher = std::sync::Arc::new(NatsPublisher { client: nats_client.clone(), kp });
-    registry.start_all(Some(publisher), Some(std::sync::Arc::new(metrics_registry.clone()))).await.expect("start adapters");
+    if let Err(e) = registry.start_all(Some(publisher), Some(std::sync::Arc::new(metrics_registry.clone()))).await {
+        eprintln!("failed to start adapters: {}", e);
+        std::process::exit(1);
+    }
     let registry = std::sync::Arc::new(registry);
 
     // Attach the client, registry and metrics as axum Extensions

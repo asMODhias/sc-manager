@@ -1,4 +1,4 @@
-use services_core_domain::domain::{member::Member, role::Role};
+use sc_manager_core::domain::{member::Member, role::Role};
 
 #[test]
 fn role_add_remove_permissions() {

@@ -27,7 +27,7 @@ mod tests {
     #[test]
     fn sign_and_verify_roundtrip() {
         // Use deterministic generation in CI if needed.
-        let kp = generate_test_keypair();
+        let kp = generate_test_keypair().expect("generate test keypair");
         let ev = DomainEvent { id: "e1".into(), kind: "Test".into(), payload: serde_json::json!({"x":1}) };
         let s = sign_event(&kp, &ev).expect("sign event");
         assert!(verify_signature(&s), "signature should verify for signed event");

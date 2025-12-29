@@ -18,7 +18,7 @@ mod tests {
     #[test]
     fn sign_and_publish_happy_path() {
         let bus = InMemoryEventBus::new();
-        let kp = generate_test_keypair();
+        let kp = generate_test_keypair().expect("generate test keypair");
         let ev = DomainEventPayload { id: "evt-1".into(), kind: "UserCreated".into(), payload: serde_json::json!({"user":"bob"}) };
         let mut sub = bus.subscribe("domain.events").expect("subscribe");
 

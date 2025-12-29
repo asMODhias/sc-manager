@@ -3,7 +3,7 @@ use serde_json::json;
 
 #[test]
 fn publish_signed_event_roundtrip_using_local_sign() {
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let ev = DomainEventPayload { id: "evt-app-1".into(), kind: "OperationCreated".into(), payload: json!({"operation_id":"opX"}) };
 
     let signed = sign_event(&kp, &ev).expect("sign event");
@@ -18,7 +18,7 @@ fn publish_signed_event_roundtrip_using_local_sign() {
 #[test]
 fn verify_signature_returns_false_for_bad_key() {
     let payload = DomainEventPayload { id: "evt-bad-1".into(), kind: "X".into(), payload: json!({}) };
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let mut signed = sc_manager_core::events::sign_event(&kp, &payload).expect("sign event");
 
     // Corrupt the public key
@@ -30,7 +30,7 @@ fn verify_signature_returns_false_for_bad_key() {
 #[test]
 fn verify_signature_returns_false_for_bad_sig() {
     let payload = DomainEventPayload { id: "evt-bad-2".into(), kind: "X".into(), payload: json!({}) };
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let mut signed = sc_manager_core::events::sign_event(&kp, &payload).expect("sign event");
 
     // Corrupt the signature

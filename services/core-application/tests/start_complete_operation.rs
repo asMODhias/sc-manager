@@ -6,7 +6,7 @@ use sc_manager_core::events::SignedEvent;
 #[test]
 fn start_operation_publishes_signed_event() {
     let bus = InMemoryEventBus::new();
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
 
     let cmd = StartOperation { operation_id: "op-2".into(), org_id: "org-1".into() };
 
@@ -23,7 +23,7 @@ fn start_operation_publishes_signed_event() {
 #[test]
 fn complete_phase_publishes_signed_event() {
     let bus = InMemoryEventBus::new();
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
 
     let cmd = CompletePhase { operation_id: "op-2".into(), phase_id: "phase1".into(), org_id: "org-1".into() };
 

@@ -86,7 +86,7 @@ fn operation_to_postgres_e2e() {
     use sc_manager_app::signing::{DomainEvent, sign_event, generate_test_keypair};
     use serde_json::to_string;
 
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let domain = DomainEvent { id: "op-e2e-1".into(), kind: "OperationCreated".into(), payload: serde_json::json!({"operation_id":"op-e2e-1","name":"E2E Ops"}) };
     let signed = sign_event(&kp, &domain);
     let ser = to_string(&signed).expect("serialize signed event");

@@ -1,0 +1,22 @@
+name: Adapter — Discord CI
+
+on:
+  push:
+    paths:
+      - 'adapters/adapter-discord/**'
+  pull_request:
+    paths:
+      - 'adapters/adapter-discord/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Run adapter-discord tests
+        run: cargo test --manifest-path adapters/adapter-discord/Cargo.toml --quiet

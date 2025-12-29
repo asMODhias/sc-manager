@@ -310,7 +310,7 @@ mod tests {
         for s in seen_vec.iter() {
             let guard = match s.lock() {
                 Ok(g) => g,
-                Err(e) => { tracing::error!("seen mutex poisoned in final check: {}", e); assert!(false, "seen mutex poisoned"); }
+                Err(e) => { tracing::error!("seen mutex poisoned in final check: {}", e); panic!("seen mutex poisoned"); }
             };
             assert!(guard.contains(&init_ev.id));
         }

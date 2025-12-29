@@ -52,8 +52,9 @@ mod tests {
         let data = ad.fetch().await.expect("fetch");
         match data {
             AdapterData::News(v) => { assert!(v.is_array()); }
-            // TODO(SOT): Replace unexpected-variant handling to return an error instead of panicking in production
-            _ => unreachable!("unexpected variant"),
+            // TODO(SOT) [TRACKED-003]: Replace unexpected-variant handling to return an error instead of panicking in production
+            // See docs/TRACKED_TODOS.md#TRACKED-003
+            _ => panic!("unexpected variant in InMemoryDiscordAdapter::fetch test"),
         }
     }
 }

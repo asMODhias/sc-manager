@@ -1,0 +1,15 @@
+name: Architecture Lint
+
+on:
+  pull_request:
+    branches: [ "develop", "main" ]
+  push:
+    branches: [ "develop", "main" ]
+
+jobs:
+  arch-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run architecture check script
+        run: python3 scripts/check_architecture.py
