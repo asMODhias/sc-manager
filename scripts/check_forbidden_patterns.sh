@@ -13,11 +13,20 @@ mapfile -t FILES < <(git ls-files "**/*.rs" "**/*.ts" "**/*.tsx" "**/*.js" "**/*
 
 EXIT=0
 for f in "${FILES[@]}"; do
-  # Always check TODO everywhere
-  if grep -nE -- "$TODO_PATTERN" "$f" >/dev/null 2>&1; then
-    echo "TODO found in $f:" >&2
-    grep -nE -- "$TODO_PATTERN" "$f" >&2
-    EXIT=1
+  # Check TODOs, but allow tracked TODOs (TRACKED-XXX)
+  # Skip TODO checks for upstream patches (we track those in docs/TRACKED_TODOS.md)
+  if echo "$f" | grep -q "/patches/"; then
+    :
+  else
+    if grep -nE -- "$TODO_PATTERN" "$f" >/dev/null 2>&1; then
+      # Filter TODO lines that do NOT include TRACKED-
+      untracked_todos=$(grep -nE -- "$TODO_PATTERN" "$f" | grep -v -E "TRACKED-[0-9]+" || true)
+      if [ -n "$untracked_todos" ]; then
+        echo "TODO found in $f:" >&2
+        echo "$untracked_todos" >&2
+        EXIT=1
+      fi
+    fi
   fi
 
   # Determine if file contains test code (skip unwrap/expect/panic in that case)

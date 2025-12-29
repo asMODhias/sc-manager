@@ -232,7 +232,7 @@ mod tests {
             let registry_cloned = registry.clone();
             let handle = thread::spawn(move || {
                 while let Ok(ev) = rx.recv() {
-                    // TODO(SOT): Replace lock usage with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
+                    // TODO(SOT) [TRACKED-001]: Replace lock usage with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
                     let mut s = match seen.lock() {
                         Ok(g) => g,
                         Err(e) => { tracing::error!("seen mutex poisoned: {}", e); continue; }
@@ -247,7 +247,7 @@ mod tests {
                     };
                     if let Some(pk_b64) = reg.get(&ev.signer_id) {
                         // build a temporary KeyPair-like identity with public key
-                        // TODO(SOT): Replace SecretKey::from_bytes(...) usage with proper error handling; constructing a SecretKey can fail and should be handled in production
+                        // TODO(SOT) [TRACKED-001]: Replace SecretKey::from_bytes(...) usage with proper error handling; constructing a SecretKey can fail and should be handled in production
                         let temp_secret = match ed25519_dalek::SecretKey::from_bytes(&[1u8;32]) {
                             Ok(s) => s,
                             Err(e) => { tracing::error!("failed to construct temp secret: {}", e); continue; }

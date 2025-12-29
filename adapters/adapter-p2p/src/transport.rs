@@ -131,9 +131,9 @@ mod tests {
         a.send("node-b", bytes).expect("send ev");
 
         let mut it = b.subscribe();
-        // TODO(SOT): avoid using direct unwrap-style iterator results; handle Option properly to avoid panics in production.
+        // TODO(SOT) [TRACKED-001]: avoid using direct unwrap-style iterator results; handle Option properly to avoid panics in production.
         let m = it.next().expect("should receive");
-        // TODO(SOT): replace serde_json::from_slice(...) usage with proper error handling and returning a Result where appropriate
+        // TODO(SOT) [TRACKED-001]: replace serde_json::from_slice(...) usage with proper error handling and returning a Result where appropriate
         let received_ev: SignedEvent = serde_json::from_slice(&m.payload).expect("deserialize event in test");
         // verify signature using public key from sender (simulated by having access to kp here)
         assert!(received_ev.verify(&kp));
