@@ -1,0 +1,28 @@
+name: Check forbidden unwrap/panic in production
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  check-no-unwrap:
+    name: Check for forbidden patterns
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Search for forbidden patterns
+        run: |
+          set -euo pipefail
+          echo "Searching for 'unwrap(' and 'panic!' in non-test source..."
+          # Find matches but exclude test folders and docs
+          matches=$(git grep -n -E "(\bunwrap\(|panic!\()" -- ':(exclude)tests/**' ':(exclude)**/tests/**' || true)
+          if [ -n "$matches" ]; then
+            echo "Forbidden patterns found:" >&2
+            echo "$matches" >&2
+            exit 1
+          fi
+          echo "No forbidden patterns found."
