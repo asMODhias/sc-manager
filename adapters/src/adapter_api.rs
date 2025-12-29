@@ -156,20 +156,26 @@ mod reg_tests {
         let pubm = MockPublisher::new();
         let events = pubm.events();
         let arc_pubm = std::sync::Arc::new(pubm);
-        reg.start_all(Some(arc_pubm), None).await.unwrap();
+        reg.start_all(Some(arc_pubm), None).await.expect("start_all failed in test");
 
         // give the scheduler a bit of time to run one iteration
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        let guard = events.lock().unwrap();
+        let guard = match events.lock() {
+            Ok(g) => g,
+            Err(e) => { tracing::error!("events mutex poisoned in test: {}", e); panic!("events mutex poisoned"); }
+        };
         assert!(!guard.is_empty(), "No events published by adapter scheduler");
 
         // Also test the direct fetch_and_update method
         let publisher2 = MockPublisher::new();
         let events2 = publisher2.events();
         let arc_pub2 = std::sync::Arc::new(publisher2);
-        reg.fetch_and_update("test", Some(arc_pub2)).await.unwrap();
-        let guard2 = events2.lock().unwrap();
+        reg.fetch_and_update("test", Some(arc_pub2)).await.expect("fetch_and_update failed in test");
+        let guard2 = match events2.lock() {
+            Ok(g) => g,
+            Err(e) => { tracing::error!("events2 mutex poisoned in test: {}", e); panic!("events2 mutex poisoned"); }
+        };
         assert_eq!(guard2.len(), 1, "fetch_and_update did not publish expected event");
     }
 }

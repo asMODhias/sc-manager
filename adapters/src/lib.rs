@@ -50,7 +50,10 @@ mod tests {
         // Wait for at least one tick (1s interval plus small buffer)
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
-        let m = msgs.lock().unwrap();
+        let m = match msgs.lock() {
+            Ok(g) => g,
+            Err(e) => { tracing::error!("msgs mutex poisoned in test: {}", e); panic!("msgs mutex poisoned"); }
+        };
         assert!(!m.is_empty(), "expected at least one published message");
         let (subj, payload) = &m[0];
         assert!(subj.starts_with("adapters."));

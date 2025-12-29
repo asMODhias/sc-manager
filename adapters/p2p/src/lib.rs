@@ -139,8 +139,8 @@ mod tests {
     #[test]
     fn inprocess_two_node_gossip_signed_event() {
         // Create two nodes
-        let node_a = KeyPair::generate().unwrap();
-        let _node_b = KeyPair::generate().unwrap();
+        let node_a = KeyPair::generate().expect("generate keypair in test");
+        let _node_b = KeyPair::generate().expect("generate keypair in test");
 
         // in-process channel simulating network
         let (tx, rx) = mpsc::channel::<SignedEvent>();
@@ -183,7 +183,7 @@ mod tests {
         const NODES: usize = 4;
 
         // generate nodes
-        let nodes: Vec<KeyPair> = (0..NODES).map(|_| KeyPair::generate().unwrap()).collect();
+        let nodes: Vec<KeyPair> = (0..NODES).map(|_| KeyPair::generate().expect("generate keypair in test")).collect();
 
         // registry of public keys (signer_id -> public_key)
         let registry: Arc<Mutex<std::collections::HashMap<String, String>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
@@ -233,17 +233,26 @@ mod tests {
             let handle = thread::spawn(move || {
                 while let Ok(ev) = rx.recv() {
                     // TODO(SOT): Replace lock().unwrap() with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
-                    let mut s = seen.lock().unwrap();
+                    let mut s = match seen.lock() {
+                        Ok(g) => g,
+                        Err(e) => { tracing::error!("seen mutex poisoned: {}", e); continue; }
+                    };
                     if s.contains(&ev.id) {
                         continue; // already seen
                     }
                     // verify signature - find signer public key via registry
-                    // TODO(SOT): Replace lock().unwrap() with proper handling to surface errors rather than panic
-                    let reg = registry_cloned.lock().unwrap();
+                    let reg = match registry_cloned.lock() {
+                        Ok(g) => g,
+                        Err(e) => { tracing::error!("registry mutex poisoned: {}", e); continue; }
+                    };
                     if let Some(pk_b64) = reg.get(&ev.signer_id) {
                         // build a temporary KeyPair-like identity with public key
                         // TODO(SOT): Replace `SecretKey::from_bytes(...).unwrap()` with error handling; using unwrap here can panic in production
-                        let temp = KeyPair { id: ev.signer_id.clone(), public_key_b64: pk_b64.clone(), secret: ed25519_dalek::SecretKey::from_bytes(&[1u8;32]).unwrap() };
+                        let temp_secret = match ed25519_dalek::SecretKey::from_bytes(&[1u8;32]) {
+                            Ok(s) => s,
+                            Err(e) => { tracing::error!("failed to construct temp secret: {}", e); continue; }
+                        };
+                        let temp = KeyPair { id: ev.signer_id.clone(), public_key_b64: pk_b64.clone(), secret: temp_secret };
                         if !ev.verify(&temp) {
                             // invalid signature -> ignore
                             continue;

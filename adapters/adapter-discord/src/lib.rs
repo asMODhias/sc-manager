@@ -40,7 +40,7 @@ mod tests {
             options: None,
         };
 
-        let res = adapter.handle_command(cmd).unwrap();
+        let res = adapter.handle_command(cmd).expect("handle_command returned Err in test");
         assert_eq!(res, "handled:ping:user123");
     }
 }
