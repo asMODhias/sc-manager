@@ -23,8 +23,10 @@ jobs:
             echo "Running check only on changed files in PR..."
             BASE=${GITHUB_BASE_REF}
             FILES=$(git diff --name-only origin/${BASE}...HEAD || true)
+            # Exclude test files and markdown/docs from PR checks to avoid flagging tests/docs
+            FILES=$(echo "$FILES" | grep -Ev '(^tests/|/tests/|\.md$)' || true)
             if [ -z "$FILES" ]; then
-              echo "No changed files detected."
+              echo "No changed non-test files detected."
               exit 0
             fi
             matches=$(git grep -n -E "(\bunwrap\(|panic!\()" -- $FILES || true)
