@@ -694,7 +694,7 @@ export default class TemplatePlugin implements Plugin {
 **ToS-SAFE Grinding Tracking:**
 - Manual reporting ONLY
 - Officer verification required
-- Read-only Game.log parsing (future) — Planned: add an **adapter** (`adapter-gamelog`) that performs **local, read-only** parsing of the game's `Game.log` to surface *suggested* mission completions for *manual* verification. Requirements: user opt-in, parsing is local only (no network), parser emits **suggestions** only (no automatic verification or state changes), and all outputs require officer verification before affecting plugin state. See ADR-013 (Design & Constraints) for details.
+- Read-only Game.log parsing — Implemented (ADR-013 **Accepted**): `adapter-gamelog` performs **local, read-only** parsing of the game's `Game.log` and exposes `parse_line`/`parse_reader`/`parse_file` APIs plus a local CLI for JSON suggestions. Requirements remain: user opt-in, parsing is local-only (no network), adapter emits **suggestions** only (no automatic verification), and all outputs require officer verification before affecting plugin state. See ADR-013 (Design & Constraints) for details.
 - NO automation
 - NO auto-completion
 - Pure tracking & coordination
