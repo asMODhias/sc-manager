@@ -4,7 +4,7 @@ use serde_json::Value as JsonValue;
 
 /// Sign `DomainEventPayload` and publish `SignedEvent` as JSON on the EventBus
 pub fn sign_and_publish<E: EventBus>(bus: &E, topic: &str, kp: &KeyPair, ev: &DomainEventPayload) -> Result<(), String> {
-    let signed = sign_event(kp, ev);
+    let signed = sign_event(kp, ev).map_err(|e| format!("sign: {}", e))?;
     let payload: JsonValue = serde_json::to_value(&signed).map_err(|e| format!("serialize: {}", e))?;
     bus.publish(topic, &payload)
 }

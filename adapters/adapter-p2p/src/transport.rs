@@ -30,7 +30,10 @@ impl InMemoryTransportRegistry {
 
     /// Register a sender for a peer ID
     pub fn register(&self, id: &str, tx: Sender<TransportMessage>) {
-        self.map.lock().unwrap().insert(id.to_string(), tx);
+        match self.map.lock() {
+            Ok(mut m) => { m.insert(id.to_string(), tx); }
+            Err(e) => tracing::error!("Mutex poisoned in InMemoryTransportRegistry::register: {}", e),
+        }
     }
 
     pub fn send_direct(&self, msg: &TransportMessage) -> Result<(), String> {
