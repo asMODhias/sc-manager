@@ -1,8 +1,8 @@
 use sc_manager_app::in_memory_fleet_repo::InMemoryFleetRepo;
 use sc_manager_app::in_memory_ship_repo::InMemoryShipRepo;
 use sc_manager_app::in_memory_session_repo::InMemorySessionRepo;
-use sc_manager_core::domain::{Fleet, Ship};
-use sc_manager_core::repositories::RepositoryError;
+use sc_manager_core::domain::{Fleet, Ship, Session};
+use sc_manager_core::repositories::{RepositoryError, FleetRepository, ShipRepository, SessionRepository};
 
 #[test]
 fn fleet_repo_crud() {
@@ -37,7 +37,7 @@ fn ship_repo_list_by_owner() {
 #[test]
 fn session_repo_create_list() {
     let mut repo = InMemorySessionRepo::new();
-    let s = sc_manager_core::domain::Session { id: "sess1".into(), org_id: "org1".into(), member_id: "m1".into(), started_at: 0 };
+    let s = Session::new("sess1", 0, Some("org1".into()), Some("m1".into()));
     assert!(repo.create(s.clone()).is_ok());
     let all = repo.list_all().unwrap();
     assert!(all.iter().any(|x| x.id == "sess1"));
