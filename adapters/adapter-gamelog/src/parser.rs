@@ -1,3 +1,7 @@
+use serde::Serialize;
+use std::io::{BufRead, BufReader};
+use std::fs::File;
+
 pub struct GameEvent {
     pub timestamp: String,
     pub event_type: String,
@@ -19,7 +23,7 @@ pub fn parse_game_log_line(line: &str) -> Result<GameEvent, &'static str> {
 // --- Mission suggestion parsing (conservative, ToS-safe) ---
 use regex::Regex;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct MissionCompletionSuggestion {
     pub mission_name: String,
     pub member_rsi: Option<String>,
@@ -50,9 +54,28 @@ pub fn parse_mission_suggestion(line: &str) -> Option<MissionCompletionSuggestio
     None
 }
 
+/// Parse a reader line-by-line and collect suggestions. Streaming-friendly.
+pub fn parse_reader<R: BufRead>(reader: R) -> Vec<MissionCompletionSuggestion> {
+    let mut suggestions = Vec::new();
+    for line in reader.lines().flatten() {
+        if let Some(s) = parse_mission_suggestion(&line) {
+            suggestions.push(s);
+        }
+    }
+    suggestions
+}
+
+/// Parse a file and return suggestions.
+pub fn parse_file(path: &std::path::Path) -> Result<Vec<MissionCompletionSuggestion>, std::io::Error> {
+    let f = File::open(path)?;
+    let reader = BufReader::new(f);
+    Ok(parse_reader(reader))
+}
+
 #[cfg(test)]
 mod mission_tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn parse_valid_mission_line() {
@@ -68,4 +91,19 @@ mod mission_tests {
         let line = "2025-12-27T20:34:12Z - Player joined the instance";
         assert!(parse_mission_suggestion(line).is_none());
     }
+
+    #[test]
+    fn parse_file_with_multiple_lines() {
+        let mut tmp = std::env::temp_dir();
+        tmp.push("adapter_gamelog_test_sample.log");
+        std::fs::write(&tmp, "2025-12-27T20:34:12Z - Member Alpha_One completed mission Wikelo Delivery\n2025-12-27T20:35:00Z - Player joined the instance\n2025-12-27T20:40:00Z - Member Beta completed mission Mining Run\n").unwrap();
+
+        let res = parse_file(&tmp).expect("file read");
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].mission_name, "Wikelo Delivery");
+        assert_eq!(res[1].mission_name, "Mining Run");
+
+        let _ = std::fs::remove_file(&tmp);
+    }
 }
+

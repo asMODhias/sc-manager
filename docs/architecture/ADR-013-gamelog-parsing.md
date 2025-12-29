@@ -1,11 +1,13 @@
 # ADR-013: Read-only Game.log parsing
 
 Date: 2025-12-29
-Status: Proposed
+Status: Accepted
 
 ## Context
 
 The Grinding plugin must remain ToS-safe: no gameplay automation and no automatic mission completion updates. Parsing the installer-local `Game.log` can help surface *suggested* mission completions to speed up manual reporting and verification, but must be constrained to avoid policy violations and preserve user privacy.
+
+**Status update:** Implementation work started and basic adapter functionality landed (parse API, CLI, unit and property tests). See Implementation Notes and Tests for details.
 
 ## Decision
 
@@ -26,8 +28,9 @@ Introduce a read-only adapter `adapter-gamelog` that:
 ## Implementation Notes
 
 - Tech: Rust adapter inside `adapters/adapter-gamelog`.
-- API: expose a simple `parse_line` + `parse_file` API that returns `MissionCompletionSuggestion`.
-- Testing: unit tests for parser rules, fuzz tests for malformed lines, and performance tests for large logs.
+- API: expose a simple `parse_line` + `parse_file` + `parse_reader` API that returns `MissionCompletionSuggestion`.
+- CLI: provide a small local CLI (`adapter_gamelog_cli`) that emits JSON suggestions (one object per line) for ad-hoc inspection or integration with the Desktop app (local-only, opt-in).
+- Testing: unit tests for parser rules, property-based (proptest) checks to ensure malformed input does not crash, and a plan for performance tests for large logs.
 - Privacy: store suggestions only in plugin-scoped storage; provide commands in UI for users to accept/reject suggestions. Suggestions are not authoritative.
 
 ## Consequences

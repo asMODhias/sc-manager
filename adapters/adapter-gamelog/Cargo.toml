@@ -8,6 +8,8 @@ publish = false
 serde = { version = "1.0", features = ["derive"] }
 regex = "1"
 lazy_static = "1"
+serde_json = "1"
 
 [dev-dependencies]
 # Test helpers
+proptest = "1"

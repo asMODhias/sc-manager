@@ -12,7 +12,7 @@ Files:
 - `src/lib.rs` - parser implementation
 - `tests/parser_test.rs` - unit tests for parser
 
-Usage (internal): called by a scheduled local job or on-demand via UI; returns suggestions for the plugin to display.
+Usage (internal or CLI): the adapter exposes `parse_line`, `parse_file` and `parse_reader` APIs for programmatic use. A small CLI is available at `src/bin/adapter_gamelog_cli.rs` (build with `cargo build --bin adapter_gamelog_cli`) that prints JSON suggestions (one-per-line) for a given `Game.log` file — still local-only and opt-in.
 
 Privacy & ToS:
 - Do not perform any automated actions in game.
