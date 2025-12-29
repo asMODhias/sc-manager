@@ -36,4 +36,10 @@ jobs:
             fi
           done
           echo "Coverage runs complete. Check artifacts/coverage for reports."
+      - name: Check coverage thresholds
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/check_coverage_thresholds.sh || true
+          ./scripts/check_coverage_thresholds.sh
+
 
