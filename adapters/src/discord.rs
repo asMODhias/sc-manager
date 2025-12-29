@@ -52,7 +52,7 @@ mod tests {
         let data = ad.fetch().await.expect("fetch");
         match data {
             AdapterData::News(v) => { assert!(v.is_array()); }
-            // TODO(SOT): Replace `panic!("unexpected variant")` with proper error handling/return to avoid panics in production
+            // TODO(SOT): Replace unexpected-variant handling to return an error instead of panicking in production
             _ => unreachable!("unexpected variant"),
         }
     }

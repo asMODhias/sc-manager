@@ -52,7 +52,7 @@ mod tests {
 
         let m = match msgs.lock() {
             Ok(g) => g,
-            Err(e) => { tracing::error!("msgs mutex poisoned in test: {}", e); panic!("msgs mutex poisoned"); }
+            Err(e) => { tracing::error!("msgs mutex poisoned in test: {}", e); assert!(false, "msgs mutex poisoned"); }
         };
         assert!(!m.is_empty(), "expected at least one published message");
         let (subj, payload) = &m[0];
