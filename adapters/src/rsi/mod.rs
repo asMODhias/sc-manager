@@ -104,7 +104,7 @@ mod tests {
         r.start_all(None, None).await.expect("start");
         let h: HashMap<String, AdapterHealth> = r.get_health().await;
         assert!(h.contains_key("simple-rsi"));
-        let ad = r.get("simple-rsi").unwrap();
+        let ad = r.get("simple-rsi").expect("simple-rsi adapter missing in test");
         let data = ad.fetch().await.expect("fetch");
         match data {
             AdapterData::Other(v) => { assert!(v.is_array()); }

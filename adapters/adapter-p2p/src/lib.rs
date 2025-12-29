@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn keypair_can_sign_and_verify() {
-        let kp = KeyPair::generate().unwrap();
+        let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "payload-123";
         let sig = kp.sign(payload);
         let ev = SignedEvent {
