@@ -10,6 +10,9 @@
 # UI
 /ui/ @asMODhias
 
+# Features
+/feature/sot/ @asMODhias
+
 # CI & infra
 /.github/ @ci-maintainer
 /docker/ @ci-maintainer
