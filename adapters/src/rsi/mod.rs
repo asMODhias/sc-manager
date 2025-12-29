@@ -85,8 +85,8 @@ mod tests {
     #[tokio::test]
     async fn verify_known_handle() {
         let c = SimpleRsiClient::new(vec!["alice", "bob"]);
-        assert!(c.verify_handle("alice").unwrap());
-        assert!(!c.verify_handle("charlie").unwrap());
+        assert!(c.verify_handle("alice").expect("verify_handle failed in test"));
+        assert!(!c.verify_handle("charlie").expect("verify_handle failed in test"));
     }
 
     #[tokio::test]
@@ -108,7 +108,7 @@ mod tests {
         let data = ad.fetch().await.expect("fetch");
         match data {
             AdapterData::Other(v) => { assert!(v.is_array()); }
-            _ => panic!("unexpected variant"),
+            _ => unreachable!("unexpected variant"),
         }
     }
 }

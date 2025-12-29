@@ -48,7 +48,7 @@ mod tests {
         r.start_all(None, None).await.expect("start");
         let h: HashMap<String, AdapterHealth> = r.get_health().await;
         assert!(h.contains_key("inmemory-discord"));
-        let ad = r.get("inmemory-discord").unwrap();
+        let ad = r.get("inmemory-discord").expect("inmemory-discord adapter missing in test");
         let data = ad.fetch().await.expect("fetch");
         match data {
             AdapterData::News(v) => { assert!(v.is_array()); }

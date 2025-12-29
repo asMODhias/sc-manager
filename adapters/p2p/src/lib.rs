@@ -288,7 +288,10 @@ mod tests {
         loop {
             let mut all_seen = true;
             for s in seen_vec.iter() {
-                let guard = s.lock().unwrap();
+                let guard = match s.lock() {
+                    Ok(g) => g,
+                    Err(e) => { tracing::error!("seen mutex poisoned while waiting: {}", e); all_seen = false; break; }
+                };
                 if !guard.contains(&init_ev.id) {
                     all_seen = false;
                     break;
@@ -305,7 +308,10 @@ mod tests {
 
         // check all nodes saw initial event
         for s in seen_vec.iter() {
-            let guard = s.lock().unwrap();
+            let guard = match s.lock() {
+                Ok(g) => g,
+                Err(e) => { tracing::error!("seen mutex poisoned in final check: {}", e); assert!(false, "seen mutex poisoned"); }
+            };
             assert!(guard.contains(&init_ev.id));
         }
 

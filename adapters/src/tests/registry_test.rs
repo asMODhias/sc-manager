@@ -8,7 +8,7 @@ fn adapters_are_registered() {
         let res = verify_adapter_allowed(id);
         assert!(res.is_ok(), "Adapter {} should be registered in adapters::registry", id);
         match res.unwrap() {
-            HubCategory::Forbidden => panic!("Adapter {} is marked forbidden", id),
+            HubCategory::Forbidden => assert!(false, "Adapter {} is marked forbidden", id),
             _ => {}
         }
     }
