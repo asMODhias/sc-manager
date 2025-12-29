@@ -41,6 +41,8 @@ Link to issue or feature in `docs/03_FEATURES_V1.md` if applicable.
 - [ ] Performance impact assessed and within budgets
 - [ ] ToS compliance verified and enforced at adapter layer if applicable
 - [ ] If deviating from the guide, an ADR is included or referenced
+- [ ] Local CI executed and green: run `scripts/run-local-ci.sh` (Linux/macOS) or `scripts/run-local-ci.ps1` (PowerShell) and confirm results
+- [ ] If using the VS Code tasks, run the "Local CI (PowerShell)" or "Local CI (Bash)" tasks before opening the PR
 
 
 ### Description
