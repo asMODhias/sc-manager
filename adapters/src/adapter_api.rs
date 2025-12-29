@@ -234,29 +234,37 @@ impl AdapterRegistry {
         // Prepare metrics if requested
         let metric_handles = if let Some(reg) = metrics_registry.as_ref() {
             // create a small set of vectors (labeled by adapter name when used)
-            let fetch_success = prometheus::IntCounterVec::new(
-                prometheus::Opts::new("adapter_fetch_success_total", "Adapter fetch successes"),
-                &["adapter"],
-            ).unwrap();
-            let fetch_failure = prometheus::IntCounterVec::new(
-                prometheus::Opts::new("adapter_fetch_failure_total", "Adapter fetch failures"),
-                &["adapter"],
-            ).unwrap();
-            let publish_total = prometheus::IntCounterVec::new(
-                prometheus::Opts::new("adapter_publish_total", "Adapter publishes"),
-                &["adapter"],
-            ).unwrap();
-            let fetch_latency = prometheus::HistogramVec::new(
-                prometheus::HistogramOpts::new("adapter_fetch_seconds", "Adapter fetch latency seconds"),
-                &["adapter"],
-            ).unwrap();
+            match (
+                prometheus::IntCounterVec::new(
+                    prometheus::Opts::new("adapter_fetch_success_total", "Adapter fetch successes"),
+                    &["adapter"],
+                ),
+                prometheus::IntCounterVec::new(
+                    prometheus::Opts::new("adapter_fetch_failure_total", "Adapter fetch failures"),
+                    &["adapter"],
+                ),
+                prometheus::IntCounterVec::new(
+                    prometheus::Opts::new("adapter_publish_total", "Adapter publishes"),
+                    &["adapter"],
+                ),
+                prometheus::HistogramVec::new(
+                    prometheus::HistogramOpts::new("adapter_fetch_seconds", "Adapter fetch latency seconds"),
+                    &["adapter"],
+                ),
+            ) {
+                (Ok(fetch_success), Ok(fetch_failure), Ok(publish_total), Ok(fetch_latency)) => {
+                    reg.register(Box::new(fetch_success.clone())).ok();
+                    reg.register(Box::new(fetch_failure.clone())).ok();
+                    reg.register(Box::new(publish_total.clone())).ok();
+                    reg.register(Box::new(fetch_latency.clone())).ok();
 
-            reg.register(Box::new(fetch_success.clone())).ok();
-            reg.register(Box::new(fetch_failure.clone())).ok();
-            reg.register(Box::new(publish_total.clone())).ok();
-            reg.register(Box::new(fetch_latency.clone())).ok();
-
-            Some(std::sync::Arc::new((fetch_success, fetch_failure, publish_total, fetch_latency)))
+                    Some(std::sync::Arc::new((fetch_success, fetch_failure, publish_total, fetch_latency)))
+                }
+                (e1, e2, e3, e4) => {
+                    tracing::error!("Failed to create metrics: {:?}, {:?}, {:?}, {:?}", e1.err(), e2.err(), e3.err(), e4.err());
+                    None
+                }
+            }
         } else { None };
 
         // Collect spawn tasks without borrowing `self` for the task lifetime
