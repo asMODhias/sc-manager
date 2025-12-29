@@ -697,6 +697,8 @@ export default class TemplatePlugin implements Plugin {
 - Read-only Game.log parsing — Implemented (ADR-013 **Accepted**): `adapter-gamelog` performs **local, read-only** parsing of the game's `Game.log` and exposes `parse_line`/`parse_reader`/`parse_file` APIs plus a local CLI for JSON suggestions. Requirements remain: user opt-in, parsing is local-only (no network), adapter emits **suggestions** only (no automatic verification), and all outputs require officer verification before affecting plugin state. See ADR-013 (Design & Constraints) for details.
 
 FleetYards CSV parsing — Implemented (ADR-014 **Accepted**): `adapter-fleetyards` parses FleetYards CSV exports into `FleetyardsRecord` objects (`timestamp`, `member_rsi`, `ship`, `action`, `raw_line`) and offers `parse_reader`/`parse_file` APIs plus a local CLI for JSON output. Parsing is conservative and local-only; outputs are hints only and require verification before affecting plugin state. See ADR-014 for details.
+
+Discord chat parsing — Implemented (ADR-016 **Accepted**): `adapter-discord` parses exported chat lines or saved message exports into `DiscordMessage` objects (`timestamp`, `author`, `channel`, `content`, `raw_line`) and exposes `parse_line`/`parse_reader`/`parse_file` APIs plus a local CLI for JSON output. Parsing is conservative and local-only; outputs are hints only and require verification before affecting plugin state. See ADR-016 for details.
 - NO automation
 - NO auto-completion
 - Pure tracking & coordination
