@@ -33,26 +33,56 @@ impl InMemoryRepo {
 
 impl Repository for InMemoryRepo {
     fn insert(&self, rec: Record) {
-        let mut map = self.data.lock().unwrap();
+        let mut map = match self.data.lock() {
+            Ok(g) => g,
+            Err(e) => {
+                tracing::error!("Mutex poisoned in InMemoryRepo::insert: {}", e);
+                e.into_inner()
+            }
+        };
         map.insert(rec.id.clone(), rec);
     }
 
     fn get(&self, id: &str) -> Option<Record> {
-        self.data.lock().unwrap().get(id).cloned()
+        match self.data.lock() {
+            Ok(g) => g.get(id).cloned(),
+            Err(e) => {
+                tracing::error!("Mutex poisoned in InMemoryRepo::get: {}", e);
+                None
+            }
+        }
     }
 
     fn begin_tx(&self) {
-        let snap = self.data.lock().unwrap().clone();
-        *self.tx_snapshot.lock().unwrap() = Some(snap);
+        let snap = match self.data.lock() {
+            Ok(g) => g.clone(),
+            Err(e) => {
+                tracing::error!("Mutex poisoned in InMemoryRepo::begin_tx: {}", e);
+                HashMap::new()
+            }
+        };
+        match self.tx_snapshot.lock() {
+            Ok(mut s) => { *s = Some(snap); }
+            Err(e) => tracing::error!("Mutex poisoned when setting tx_snapshot: {}", e),
+        }
     }
 
     fn commit_tx(&self) {
-        *self.tx_snapshot.lock().unwrap() = None;
+        match self.tx_snapshot.lock() {
+            Ok(mut s) => { *s = None; }
+            Err(e) => tracing::error!("Mutex poisoned when clearing tx_snapshot: {}", e),
+        }
     }
 
     fn rollback_tx(&self) {
-        if let Some(snap) = self.tx_snapshot.lock().unwrap().take() {
-            *self.data.lock().unwrap() = snap;
+        match self.tx_snapshot.lock() {
+            Ok(mut s) => if let Some(snap) = s.take() {
+                match self.data.lock() {
+                    Ok(mut d) => *d = snap,
+                    Err(e) => tracing::error!("Mutex poisoned when rolling back data: {}", e),
+                }
+            },
+            Err(e) => tracing::error!("Mutex poisoned when accessing tx_snapshot: {}", e),
         }
     }
 }
