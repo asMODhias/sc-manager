@@ -115,7 +115,7 @@ mod tests {
         let a = MockQuicTransport::new("node-a", reg.clone());
         let b = MockQuicTransport::new("node-b", reg.clone());
 
-        let kp = KeyPair::generate();
+        let kp = KeyPair::generate().unwrap();
         let payload = "op:announce".to_string();
         let sig = kp.sign(&payload);
         let ev = SignedEvent { id: "s1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };

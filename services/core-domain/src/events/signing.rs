@@ -98,5 +98,5 @@ pub fn verify_signature(signed: &SignedEvent) -> bool {
 
 /// Deterministic test keypair (for CI/testing only)
 pub fn generate_test_keypair() -> KeyPair {
-    KeyPair::generate()
+    KeyPair::generate().expect("generate test keypair")
 }

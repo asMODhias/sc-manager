@@ -28,18 +28,18 @@ pub struct KeyPair {
 }
 
 impl KeyPair {
-    pub fn generate() -> Self {
+    pub fn generate() -> Result<Self, String> {
         // Deterministic/test-friendly keypair generation to avoid RNG dependency conflicts in CI.
         use ed25519_dalek::{PublicKey, SecretKey};
         let sk_bytes = [1u8; 32];
-        let sk = SecretKey::from_bytes(&sk_bytes).unwrap();
+        let sk = SecretKey::from_bytes(&sk_bytes).map_err(|e| format!("SecretKey::from_bytes failed: {}", e))?;
         let pk = PublicKey::from(&sk);
         let pk_b64 = base64::encode(pk.to_bytes());
-        Self {
+        Ok(Self {
             id: format!("node-{}", pk_b64.get(0..8).unwrap_or("xx")),
             public_key_b64: pk_b64,
             secret: sk,
-        }
+        })
     }
 }
 
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn keypair_can_sign_and_verify() {
-        let kp = KeyPair::generate();
+        let kp = KeyPair::generate().unwrap();
         let payload = "payload-123";
         let sig = kp.sign(payload);
         let ev = SignedEvent {
@@ -121,8 +121,8 @@ mod tests {
     #[test]
     fn inprocess_two_node_gossip_signed_event() {
         // Create two nodes
-        let node_a = KeyPair::generate();
-        let _node_b = KeyPair::generate();
+        let node_a = KeyPair::generate().unwrap();
+        let _node_b = KeyPair::generate().unwrap();
 
         // in-process channel simulating network
         let (tx, rx) = mpsc::channel::<SignedEvent>();
@@ -165,7 +165,7 @@ mod tests {
         const NODES: usize = 4;
 
         // generate nodes
-        let nodes: Vec<KeyPair> = (0..NODES).map(|_| KeyPair::generate()).collect();
+        let nodes: Vec<KeyPair> = (0..NODES).map(|_| KeyPair::generate().unwrap()).collect();
 
         // registry of public keys (signer_id -> public_key)
         let registry: Arc<Mutex<std::collections::HashMap<String, String>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
