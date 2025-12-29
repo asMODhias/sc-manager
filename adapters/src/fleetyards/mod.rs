@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn fetch_empty_returns_ok() {
         let c = SimpleFleetYardClient::new();
-        let r = c.fetch_ships_for_org("orgX").unwrap();
+        let r = c.fetch_ships_for_org("orgX").expect("fetch_ships_for_org failed in test");
         assert!(r.is_empty());
     }
 
@@ -70,7 +70,7 @@ mod tests {
             "orgZ",
             vec![Ship::new("s1", "Aurora"), Ship::new("s2", "Avenger")],
         );
-        let r = c.fetch_ships_for_org("orgZ").unwrap();
+        let r = c.fetch_ships_for_org("orgZ").expect("fetch_ships_for_org failed in test");
         assert_eq!(r.len(), 2);
         assert_eq!(r[0].id, "s1");
     }
