@@ -1,0 +1,21 @@
+[package]
+name = "adapter-llm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "adapter_llm"
+path = "src/lib.rs"
+
+[dependencies]
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+sc_manager_adapters = { path = "../" }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

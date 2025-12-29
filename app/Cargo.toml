@@ -1,0 +1,18 @@
+[package]
+name = "sc_manager_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sc_manager_core = { path = "../services/core-domain" }
+
+[dev-dependencies]
+sc_manager_adapters = { path = "../adapters" }
+
+[lib]
+name = "sc_manager_app"
+path = "src/lib.rs"
+
+# Make this crate self-contained for tooling runs (avoid workspace metadata errors when invoked in isolation)
+[workspace]
+

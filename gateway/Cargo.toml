@@ -1,0 +1,13 @@
+[package]
+name = "sc_manager_gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-graphql = "5"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1.0", features = ["derive"] }
+sc_manager_core = { path = "../services/core-domain" }
+
+[dev-dependencies]
+# Add test helpers here

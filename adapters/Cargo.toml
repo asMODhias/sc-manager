@@ -1,0 +1,26 @@
+[package]
+name = "sc_manager_adapters"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sc_manager_adapters"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+sc_manager_core = { path = "../services/core-domain" }
+
+# Tokio runtime (used by scheduler tasks)
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+cron = "0.6"
+prometheus = "0.14"
+
+[dev-dependencies]
+# Keep tokio in dev-deps for tests (no-op if already present)
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }

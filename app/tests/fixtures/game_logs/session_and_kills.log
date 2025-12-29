@@ -1,0 +1,5 @@
+SessionStart 1610000000
+Kill 1610000100 killer=alice victim=bob weapon="Laser Cannon"
+Kill 1610000150 killer=bob victim=alice weapon="Rail Gun"
+Death 1610000200 victim=charlie
+SessionEnd 1610003600
