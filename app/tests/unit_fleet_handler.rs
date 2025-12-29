@@ -2,8 +2,6 @@ use sc_manager_app::handlers::fleet_handler::FleetHandler;
 use sc_manager_app::commands::CreateFleetCommand;
 use sc_manager_core::domain::{Fleet, Ship};
 use sc_manager_core::repositories::{FleetRepository, RepositoryError, ShipRepository};
-use sc_manager_core::domain::member::Member;
-use sc_manager_core::domain::role::Role;
 
 use std::collections::HashMap;
 
@@ -103,10 +101,11 @@ fn add_and_remove_ship_in_fleet() {
     let mut h = FleetHandler::new(&mut fleet_repo, &mut ship_repo);
     assert!(h.add_ship_to_fleet("ff", "s1").is_ok());
 
-    let f = fleet_repo.get("ff").unwrap();
+    // query through handler-held repo to avoid borrow conflicts
+    let f = h.fleet_repo.get("ff").unwrap();
     assert!(f.list_ships().iter().any(|s| s.id == "s1"));
 
     assert!(h.remove_ship_from_fleet("ff", "s1").is_ok());
-    let f2 = fleet_repo.get("ff").unwrap();
+    let f2 = h.fleet_repo.get("ff").unwrap();
     assert!(!f2.list_ships().iter().any(|s| s.id == "s1"));
 }
