@@ -17,6 +17,9 @@ pub async fn metrics_handler(Extension(registry): Extension<std::sync::Arc<prome
     let encoder = TextEncoder::new();
     let mf = registry.gather();
     let mut buffer = Vec::new();
-    encoder.encode(&mf, &mut buffer).unwrap();
+    if let Err(e) = encoder.encode(&mf, &mut buffer) {
+        tracing::error!("failed to encode metrics: {}", e);
+        return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, [("content-type", encoder.format_type().to_string())], Vec::new());
+    }
     (axum::http::StatusCode::OK, [("content-type", encoder.format_type().to_string())], buffer)
 }

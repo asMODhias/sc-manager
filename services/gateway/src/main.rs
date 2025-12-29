@@ -53,7 +53,14 @@ async fn main() {
     let app = Router::new()
         .route("/events", post(events_handler))
         .route("/health", axum::routing::get(crate::handlers::health_handler));
-    let addr: SocketAddr = std::env::var("GATEWAY_BIND").unwrap_or_else(|_| "0.0.0.0:8080".into()).parse().unwrap();
+    let bind = std::env::var("GATEWAY_BIND").unwrap_or_else(|_| "0.0.0.0:8080".into());
+    let addr: SocketAddr = match bind.parse() {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::error!("Invalid GATEWAY_BIND '{}': {}. Falling back to 0.0.0.0:8080", bind, e);
+            "0.0.0.0:8080".parse().expect("default bind is a valid socket address")
+        }
+    };
     info!("Gateway running on {}", addr);
 
     // Connect to NATS once and share the client with handlers
@@ -120,8 +127,11 @@ async fn main() {
         .layer(Extension(std::sync::Arc::new(metrics_registry.clone())));
 
     // Use axum-server for binding which provides a cross-platform helper
-    axum_server::bind(addr)
+    if let Err(e) = axum_server::bind(addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+    {
+        eprintln!("server error: {}", e);
+        std::process::exit(1);
+    }
 }
