@@ -1,0 +1,14 @@
+D:\Data\Star Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\deps\serde-2da3469e0b7e5c8b.d: C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs D:\Data\Star\ Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\build\serde-170d25af167437ff\out/private.rs
+
+D:\Data\Star Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\deps\libserde-2da3469e0b7e5c8b.rlib: C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs D:\Data\Star\ Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\build\serde-170d25af167437ff\out/private.rs
+
+D:\Data\Star Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\deps\libserde-2da3469e0b7e5c8b.rmeta: C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs D:\Data\Star\ Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\build\serde-170d25af167437ff\out/private.rs
+
+C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs:
+C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs:
+C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs:
+C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs:
+C:\Users\brotz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs:
+D:\Data\Star\ Citizen\Tools\Manager\adapters\adapter-fleetyards\target\debug\build\serde-170d25af167437ff\out/private.rs:
+
+# env-dep:OUT_DIR=D:\\Data\\Star Citizen\\Tools\\Manager\\adapters\\adapter-fleetyards\\target\\debug\\build\\serde-170d25af167437ff\\out
