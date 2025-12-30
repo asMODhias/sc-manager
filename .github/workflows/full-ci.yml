@@ -1,0 +1,46 @@
+name: Full CI (clippy + tests including prost/libp2p)
+
+on:
+  pull_request:
+    branches: [ '**' ]
+  push:
+    branches: [ 'main', 'master', 'feature/*' ]
+
+jobs:
+  build:
+    name: Full workspace check on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    env:
+      PROTOC_VERSION: 23.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install protoc (attempt non-interactive)
+        run: |
+          set -e
+          ./scripts/install-protoc.sh || true
+
+      - name: Cargo fmt check
+        run: |
+          cargo fmt -- --check
+
+      - name: Cargo clippy (workspace, deny warnings)
+        run: |
+          # Ensure protoc is available for prost builds
+          if command -v protoc >/dev/null 2>&1; then echo "protoc available"; else echo "protoc not found, failing CI"; exit 1; fi
+          cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run cargo test (workspace)
+        run: |
+          cargo test --workspace --all-features -- --nocapture
