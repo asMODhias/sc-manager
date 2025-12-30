@@ -54,14 +54,30 @@ if ($IsWindows) {
     }
 
     if (Get-Command apt-get -ErrorAction SilentlyContinue) {
-        Write-Host "[install-protoc] apt-get detected — attempting 'sudo apt-get install -y protobuf-compiler'"
-        sudo apt-get update; sudo apt-get install -y protobuf-compiler || Write-Host "[install-protoc] apt-get failed" -ForegroundColor Yellow
+        Write-Host "[install-protoc] apt-get detected — attempting non-interactive apt-get install"
+        $sudoAvailable = $false
+        try { sudo -n true; $sudoAvailable = $true } catch { $sudoAvailable = $false }
+        if ($sudoAvailable) {
+            sudo apt-get update; sudo apt-get install -y protobuf-compiler || Write-Host "[install-protoc] apt-get failed" -ForegroundColor Yellow
+        } elseif ([int](whoami -u) -eq 0) {
+            apt-get update; apt-get install -y protobuf-compiler || Write-Host "[install-protoc] apt-get failed" -ForegroundColor Yellow
+        } else {
+            Write-Host "[install-protoc] sudo not available or requires password; skipping apt-get (will try download fallback)" -ForegroundColor Yellow
+        }
         if (Found-Protoc) { Write-Host "[install-protoc] protoc installed via apt-get" ; exit 0 }
     }
 
     if (Get-Command yum -ErrorAction SilentlyContinue) {
-        Write-Host "[install-protoc] yum detected — attempting 'sudo yum install -y protobuf-compiler'"
-        sudo yum install -y protobuf-compiler || Write-Host "[install-protoc] yum failed" -ForegroundColor Yellow
+        Write-Host "[install-protoc] yum detected — attempting non-interactive yum install"
+        $sudoAvailable = $false
+        try { sudo -n true; $sudoAvailable = $true } catch { $sudoAvailable = $false }
+        if ($sudoAvailable) {
+            sudo yum install -y protobuf-compiler || Write-Host "[install-protoc] yum failed" -ForegroundColor Yellow
+        } elseif ([int](whoami -u) -eq 0) {
+            yum install -y protobuf-compiler || Write-Host "[install-protoc] yum failed" -ForegroundColor Yellow
+        } else {
+            Write-Host "[install-protoc] sudo not available or requires password; skipping yum (will try download fallback)" -ForegroundColor Yellow
+        }
         if (Found-Protoc) { Write-Host "[install-protoc] protoc installed via yum" ; exit 0 }
     }
 

@@ -27,24 +27,42 @@ case "$uname_s" in
   Linux)
     # Try common package managers first
     if command -v apt-get >/dev/null 2>&1; then
-      echo "[install-protoc] apt-get detected — trying apt-get"
-      sudo apt-get update && sudo apt-get install -y protobuf-compiler || true
+      echo "[install-protoc] apt-get detected — trying apt-get (non-interactive)"
+      if sudo -n true 2>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y protobuf-compiler || true
+      elif [ "$(id -u)" -eq 0 ]; then
+        apt-get update && apt-get install -y protobuf-compiler || true
+      else
+        echo "[install-protoc] sudo not available or requires password; skipping apt-get (will try download fallback)" >&2
+      fi
       if command -v protoc >/dev/null 2>&1; then
         echo "[install-protoc] protoc installed via apt-get"
         exit 0
       fi
     fi
     if command -v yum >/dev/null 2>&1; then
-      echo "[install-protoc] yum detected — trying yum"
-      sudo yum install -y protobuf-compiler || true
+      echo "[install-protoc] yum detected — trying yum (non-interactive)"
+      if sudo -n true 2>/dev/null; then
+        sudo yum install -y protobuf-compiler || true
+      elif [ "$(id -u)" -eq 0 ]; then
+        yum install -y protobuf-compiler || true
+      else
+        echo "[install-protoc] sudo not available or requires password; skipping yum (will try download fallback)" >&2
+      fi
       if command -v protoc >/dev/null 2>&1; then
         echo "[install-protoc] protoc installed via yum"
         exit 0
       fi
     fi
     if command -v pacman >/dev/null 2>&1; then
-      echo "[install-protoc] pacman detected — trying pacman"
-      sudo pacman -S --noconfirm protobuf || true
+      echo "[install-protoc] pacman detected — trying pacman (non-interactive)"
+      if sudo -n true 2>/dev/null; then
+        sudo pacman -S --noconfirm protobuf || true
+      elif [ "$(id -u)" -eq 0 ]; then
+        pacman -S --noconfirm protobuf || true
+      else
+        echo "[install-protoc] sudo not available or requires password; skipping pacman (will try download fallback)" >&2
+      fi
       if command -v protoc >/dev/null 2>&1; then
         echo "[install-protoc] protoc installed via pacman"
         exit 0
