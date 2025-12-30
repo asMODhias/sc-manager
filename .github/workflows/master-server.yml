@@ -1,0 +1,22 @@
+name: Master Server CI
+
+on:
+  push:
+    paths:
+      - 'services/master-server/**'
+  pull_request:
+    paths:
+      - 'services/master-server/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run master-server tests
+        working-directory: ./services/master-server
+        run: cargo test --verbose

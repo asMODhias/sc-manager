@@ -1,0 +1,22 @@
+[package]
+name = "sc_manager_master_server"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sc_manager_master_server"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+tracing = "0.1"
+# runtime
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+
+[dev-dependencies]
+# for async tests
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+
+[package.metadata.cargo-fmt]
+# follow workspace defaults if any

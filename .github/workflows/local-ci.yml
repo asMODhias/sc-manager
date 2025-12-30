@@ -24,6 +24,10 @@ jobs:
         working-directory: ./core
         run: cargo test --verbose
 
+      - name: Run master-server tests
+        working-directory: ./services/master-server
+        run: cargo test --verbose
+
       - name: Run adapters tests
         working-directory: ./adapters
         run: cargo test --verbose
