@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::Path;
 
 /// Simple delta chunker used for splitting update payloads into fixed-size chunks.
-
 /// Split `data` into chunks of at most `chunk_size` bytes. Last chunk may be smaller.
 pub fn chunks(data: &[u8], chunk_size: usize) -> Vec<Vec<u8>> {
     if chunk_size == 0 {
@@ -50,7 +49,7 @@ pub fn apply_chunks<P: AsRef<Path>>(chunks: &[Vec<u8>], dest_path: P, expected_s
     }
 
     // atomic rename
-    fs::rename(&tmp, &dest)?;
+    fs::rename(&tmp, dest)?;
     Ok(())
 }
 

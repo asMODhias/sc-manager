@@ -125,12 +125,18 @@ impl AuthorService {
 
     /// Create a new keypair in the keystore for `name`, returning public key bytes
     pub fn create_keypair(&self, name: &str) -> Result<Vec<u8>, AuthorError> {
-        self.keystore.create_keypair(name).map_err(|e| e)
+        self.keystore.create_keypair(name)
     }
 
     /// Rotate keypair for `name`
     pub fn rotate_keypair(&self, name: &str) -> Result<Vec<u8>, AuthorError> {
         self.keystore.rotate_keypair(name)
+    }
+}
+
+impl Default for AuthorService {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
