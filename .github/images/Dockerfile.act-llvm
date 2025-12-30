@@ -1,0 +1,39 @@
+FROM nektos/act-environments-ubuntu:18.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Remove third-party apt sources to avoid expired keys / missing Release files on old base image
+RUN rm -f /etc/apt/sources.list.d/* || true
+# Replace /etc/apt/sources.list with a minimal official mirror to avoid broken third-party entries
+RUN printf "deb http://archive.ubuntu.com/ubuntu bionic main restricted universe multiverse\n" > /etc/apt/sources.list && \
+    printf "deb http://archive.ubuntu.com/ubuntu bionic-updates main restricted universe multiverse\n" >> /etc/apt/sources.list && \
+    printf "deb http://security.ubuntu.com/ubuntu bionic-security main restricted universe multiverse\n" >> /etc/apt/sources.list && \
+    printf "deb http://archive.ubuntu.com/ubuntu bionic-backports main restricted universe multiverse\n" >> /etc/apt/sources.list
+
+# Install system dependencies and LLVM tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      curl ca-certificates build-essential git pkg-config libssl-dev llvm-9 llvm-9-tools clang-9 sudo gnupg2 apt-transport-https lsb-release lcov && \
+    ln -sf /usr/bin/llvm-profdata-9 /usr/bin/llvm-profdata || true && \
+    ln -sf /usr/bin/llvm-cov-9 /usr/bin/llvm-cov || true && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install rustup and toolchains (stable + nightly)
+RUN curl https://sh.rustup.rs -sSf -o /tmp/rustup-init.sh && \
+    chmod +x /tmp/rustup-init.sh && \
+    /tmp/rustup-init.sh -y --no-modify-path --default-toolchain stable && \
+    /root/.cargo/bin/rustup toolchain install nightly || true
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install cargo-tarpaulin (used by our coverage workflow)
+RUN cargo install cargo-tarpaulin --version 0.23.0 || true
+
+# Ensure canonical llvm tool names are available
+RUN if [ -x "$(command -v llvm-profdata-15)" ]; then ln -sf "$(command -v llvm-profdata-15)" /usr/bin/llvm-profdata || true; fi || true
+RUN if [ -x "$(command -v llvm-cov-15)" ]; then ln -sf "$(command -v llvm-cov-15)" /usr/bin/llvm-cov || true; fi || true
+
+WORKDIR /work
+
+# Quick smoke check at build-time
+RUN echo "Image prepared for sc-manager local coverage runs" && llvm-profdata --version || true
