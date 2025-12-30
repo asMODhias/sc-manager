@@ -1,5 +1,7 @@
 use crate::crdt::CRDTStateManager;
-use crate::gossip::{HashGossipNode, GossipUpdate};
+use crate::gossip::HashGossipNode;
+#[cfg(feature = "libp2p")]
+use crate::gossip::GossipUpdate;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
@@ -7,12 +9,12 @@ use tokio::time::{interval, Duration};
 /// Master client stub for reporting to author master
 #[derive(Clone)]
 pub struct MasterClient {
-    base_url: String,
+    _base_url: String,
 }
 
 impl MasterClient {
     pub fn new(base_url: String) -> Self {
-        Self { base_url }
+        Self { _base_url: base_url }
     }
 
     pub async fn report_health(&self, _node_id: &str) -> Result<(), MasterClientError> {
@@ -31,7 +33,7 @@ pub enum MasterClientError {
 ///
 /// Coordinates CRDT and HashGossip to report and monitor state.
 pub struct MiniMaster {
-    node_id: String,
+    _node_id: String,
     pub crdt: Arc<CRDTStateManager>,
     /// In-memory gossip node (optional)
     pub gossip: Option<Arc<RwLock<HashGossipNode>>>,
@@ -62,7 +64,7 @@ impl MiniMaster {
         is_author: bool,
     ) -> Self {
         Self {
-            node_id,
+            _node_id: node_id,
             crdt: Arc::new(crdt),
             gossip: Some(Arc::new(RwLock::new(gossip))),
             #[cfg(feature = "libp2p")]
@@ -106,7 +108,7 @@ impl MiniMaster {
         }
 
         Self {
-            node_id,
+            _node_id: node_id,
             crdt: arc_crdt,
             gossip: None,
             gossip_control: Some(control_tx),
@@ -242,21 +244,18 @@ mod tests {
         // start periodic broadcasting with short interval
         mm.start_hash_broadcast_with_interval(Duration::from_millis(20)).await;
 
-        // Wait for a couple of broadcasts
-        sleep(Duration::from_millis(60)).await;
-
-        // We should have received at least one HashReceived
-        let mut found = false;
-        while let Ok(u) = rx.try_recv() {
-            if let crate::gossip::GossipUpdate::HashReceived { peer_id, entity_id, .. } = u {
+        // Wait for a broadcast with timeout to avoid flaky try_recv loops
+        use tokio::time::timeout;
+        let res = timeout(Duration::from_millis(200), rx.recv()).await;
+        match res {
+            Ok(Some(crate::gossip::GossipUpdate::HashReceived { peer_id, entity_id, .. })) => {
                 assert_eq!(peer_id, "peer-mm");
                 assert_eq!(entity_id, "global");
-                found = true;
-                break;
             }
+            Ok(Some(_)) => panic!("received unexpected gossip update"),
+            Ok(None) => panic!("gossip channel closed"),
+            Err(_) => panic!("timeout waiting for HashReceived"),
         }
-
-        assert!(found, "expected at least one HashReceived event");
     }
 
     // E2E test using TCP-backed libp2p stub control channels
@@ -311,10 +310,12 @@ mod tests {
         // start broadcasting on node2 with short interval
         mm2.start_hash_broadcast_with_interval(Duration::from_millis(20)).await;
 
-        // node1's rx1 should receive HashReceived from node2
+        // node1's rx1 should receive HashReceived from node2 within a timeout
+        use tokio::time::{Instant, timeout};
+        let deadline = Instant::now() + Duration::from_secs(2);
         let mut saw = false;
-        for _ in 0..40 {
-            if let Some(u) = rx1.recv().await {
+        while Instant::now() < deadline {
+            if let Ok(Some(u)) = timeout(Duration::from_millis(250), rx1.recv()).await {
                 if let crate::gossip::GossipUpdate::HashReceived { peer_id: _p, entity_id, hash } = u {
                     if entity_id == "global" {
                         // compute node1 local hash and ensure mismatch (since states differ)
@@ -326,8 +327,7 @@ mod tests {
                     }
                 }
             }
-            sleep(Duration::from_millis(25)).await;
         }
-        assert!(saw, "expected node1 to receive a HashReceived from node2");
+        assert!(saw, "expected node1 to receive a HashReceived from node2 within timeout");
     }
 }
