@@ -108,7 +108,7 @@ impl MiniMaster {
         }
 
         Self {
-            node_id,
+            _node_id: node_id,
             crdt: arc_crdt,
             gossip: None,
             gossip_control: Some(control_tx),
