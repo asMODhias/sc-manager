@@ -36,6 +36,12 @@ Snapshot & compaction
 - Compaction rotates the ledger file (renames to `ledgerfile.old.<ts>`) and writes a fresh ledger file after snapshot.
 - The snapshot is written atomically: write to a `.tmp` file and `rename()`.
 
+Usage & API notes
+-----------------
+- Programmatic: call `master.marketplace.read().await.compact().await` from admin code to trigger a snapshot and rotation.
+- Testing: `Marketplace::compact()` is exercised by unit tests which assert the snapshot exists and reloading via `Marketplace::with_ledger(path)` reconstructs state.
+- Future: consider adding an authenticated admin endpoint to trigger compaction remotely and integrate with scheduled maintenance jobs.
+
 Notes & Next steps
 ------------------
 - OpenAPI generation is planned; for now see `docs/MASTER_SERVER_API.md` for contract and example payloads.
