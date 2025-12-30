@@ -21,9 +21,9 @@ pub fn parse_line(line: &str) -> Option<ErkulRecord> {
     }
 
     // Split into at most 4 parts
-    let mut parts = s.splitn(4, ',').map(|p| p.trim()).collect::<Vec<_>>();
+    let parts = s.splitn(4, ',').map(|p| p.trim()).collect::<Vec<_>>();
 
-    let timestamp = parts.get(0).and_then(|t| if !t.is_empty() { Some(t.to_string()) } else { None });
+    let timestamp = parts.first().and_then(|t| if !t.is_empty() { Some(t.to_string()) } else { None });
     let member_rsi = parts.get(1).and_then(|m| if !m.is_empty() { Some(m.to_string()) } else { None });
     let event = parts.get(2).and_then(|e| if !e.is_empty() { Some(e.to_string()) } else { None });
     let details = parts.get(3).and_then(|d| if !d.is_empty() { Some(d.to_string()) } else { None });

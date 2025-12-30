@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 sc_manager_core = { path = "../../services/core-domain" }
+tracing = "0.1"
 
 [dev-dependencies]
 # Add DB test helpers here

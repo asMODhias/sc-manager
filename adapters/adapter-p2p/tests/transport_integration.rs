@@ -1,5 +1,7 @@
+use base64::Engine;
 use sc_manager_p2p::transport::{InMemoryTransportRegistry, MockQuicTransport};
-use sc_manager_p2p::{KeyPair, SignedEvent, Signer, Transport};
+use sc_manager_core::events::KeyPair;
+use sc_manager_p2p::{SignedEvent, Transport};
 
 #[test]
 fn multi_peer_quic_simulation_broadcast() {
@@ -12,7 +14,8 @@ fn multi_peer_quic_simulation_broadcast() {
     // Create an event from node-0
     let kp = KeyPair::generate().unwrap();
     let payload = "op:multi-announce".to_string();
-    let sig = kp.sign(&payload);
+    let sig_bytes = kp.sign(payload.as_bytes()).expect("sign");
+    let sig = base64::engine::general_purpose::STANDARD.encode(sig_bytes);
     let ev = SignedEvent { id: "evt-q1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };
     let bytes = serde_json::to_vec(&ev).unwrap();
 

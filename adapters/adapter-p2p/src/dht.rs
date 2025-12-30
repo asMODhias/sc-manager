@@ -33,6 +33,12 @@ impl DhtRegistry for InMemoryDht {
     }
 }
 
+impl Default for InMemoryDht {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

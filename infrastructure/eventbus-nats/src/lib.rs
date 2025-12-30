@@ -29,7 +29,14 @@ impl InMemoryEventBus {
             Ok(g) => g,
             Err(_) => return None,
         };
-        if evs.len() == 0 { None } else { Some(evs.remove(0)) }
+        if evs.is_empty() { None } else { Some(evs.remove(0)) }
+    }
+
+}
+
+impl Default for InMemoryEventBus {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -70,7 +70,7 @@ impl ShipRepository for InMemShipRepo {
     }
 
     fn list_by_owner_org(&self, org_id: &str) -> Result<Vec<Ship>, RepositoryError> {
-        Ok(self.map.values().cloned().filter(|s| s.owner_org.as_deref() == Some(org_id)).collect())
+        Ok(self.map.values().filter(|s| s.owner_org.as_deref() == Some(org_id)).cloned().collect())
     }
 }
 

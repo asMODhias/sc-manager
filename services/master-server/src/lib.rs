@@ -6,7 +6,16 @@ use tracing::info;
 pub mod keys;
 pub mod config;
 
+pub mod domain;
+pub mod storage;
+
+pub mod api;
+pub mod publish;
+
 use keys::KeyStore;
+use crate::storage::AppendOnlyLedger;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Debug, Error)]
 pub enum MasterError {
@@ -18,29 +27,38 @@ pub enum MasterError {
 pub struct MasterServer {
     pub id: String,
     pub ks: KeyStore,
+    pub ledger: Arc<AppendOnlyLedger>,
 }
 
 impl Default for MasterServer {
     fn default() -> Self {
-        Self { id: "master-0".to_string(), ks: KeyStore::generate_testpair() }
+        let ledger = Arc::new(AppendOnlyLedger::new(std::env::temp_dir().join("master_ledger.ndjson")));
+        Self { id: "master-0".to_string(), ks: KeyStore::generate_testpair(), ledger }
     }
 }
 
 impl MasterServer {
-    pub fn new(id: impl Into<String>, ks: KeyStore) -> Self {
-        Self { id: id.into(), ks }
+    pub fn new(id: impl Into<String>, ks: KeyStore, ledger: Arc<AppendOnlyLedger>) -> Self {
+        Self { id: id.into(), ks, ledger }
     }
 
     /// Helper to build from defaults (useful for tests)
     pub fn new_with_defaults(id: impl Into<String>) -> Self {
-        Self { id: id.into(), ks: KeyStore::generate_testpair() }
+        Self { id: id.into(), ks: KeyStore::generate_testpair(), ledger: Arc::new(AppendOnlyLedger::new(std::env::temp_dir().join("master_ledger.ndjson"))) }
     }
 
-    /// Start the master server (async placeholder)
-    pub async fn start(&self) -> Result<(), MasterError> {
+    /// Run the server with provided address (non-blocking)
+    pub async fn run(self: Arc<Self>, addr: std::net::SocketAddr) -> Result<(), MasterError> {
         info!("starting master server: {}", self.id);
-        // placeholder: initialize storage, keys, network
+        crate::api::run_server(self.clone(), addr).await?;
         Ok(())
+    }
+
+    /// Minimal start used in tests when not running HTTP
+    pub fn new_with_ledger(id: impl Into<String>, ledger_path: PathBuf) -> Self {
+        let ks = KeyStore::generate_testpair();
+        let ledger = Arc::new(AppendOnlyLedger::new(ledger_path));
+        Self { id: id.into(), ks, ledger }
     }
 }
 
@@ -49,16 +67,17 @@ mod server_tests {
     use super::*;
 
     #[tokio::test]
-    async fn start_with_generated_key() {
+    async fn new_with_generated_key() {
         let ks = KeyStore::generate_testpair();
-        let m = MasterServer::new("srv-1", ks);
-        m.start().await.expect("start");
+        let ledger = std::env::temp_dir().join("ms_test_ledger.ndjson");
+        let m = MasterServer::new("srv-1", ks, std::sync::Arc::new(crate::storage::AppendOnlyLedger::new(ledger)));
+        assert_eq!(m.id, "srv-1");
     }
 
     #[tokio::test]
-    async fn start_with_defaults() {
+    async fn new_with_defaults_ok() {
         let m = MasterServer::new_with_defaults("srv-default");
-        m.start().await.expect("start");
+        assert_eq!(m.id, "srv-default");
     }
 }
 
@@ -67,10 +86,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn new_and_start() {
+    async fn new_and_defaults() {
         let m = MasterServer::new_with_defaults("test-master");
         assert_eq!(m.id, "test-master");
-        m.start().await.expect("start");
     }
 
     #[test]

@@ -13,7 +13,7 @@ RUN printf "deb http://archive.ubuntu.com/ubuntu bionic main restricted universe
 # Install system dependencies and LLVM tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      curl ca-certificates build-essential git pkg-config libssl-dev llvm-9 llvm-9-tools clang-9 sudo gnupg2 apt-transport-https lsb-release lcov && \
+      curl ca-certificates build-essential git pkg-config libssl-dev llvm-9 llvm-9-tools clang-9 lcov sudo gnupg2 apt-transport-https lsb-release && \
     ln -sf /usr/bin/llvm-profdata-9 /usr/bin/llvm-profdata || true && \
     ln -sf /usr/bin/llvm-cov-9 /usr/bin/llvm-cov || true && \
     rm -rf /var/lib/apt/lists/*

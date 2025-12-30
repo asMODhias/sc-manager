@@ -1,4 +1,4 @@
-use adapter_uex::{parse_file, UexRecord};
+use adapter_uex::{parse_file};
 use serde_json::to_string;
 use std::env;
 use std::path::Path;

@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn loads_env_b64_key() {
         let seed = [1u8; 32];
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&seed);
+        let b64 = base64::engine::general_purpose::STANDARD.encode(seed);
         env::set_var("GATEWAY_PRIVATE_KEY", b64);
         let kp = load_gateway_keypair().expect("load");
         assert_eq!(kp.secret_bytes, seed);

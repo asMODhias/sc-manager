@@ -24,6 +24,7 @@ hyper = { version = "1", features = ["full"] } # align with axum's hyper depende
 # Utilities
 uuid = { version = "1", features = ["v4"] }
 base64 = "0.21"
+tracing = "0.1"
 
 # Logging
 log = "0.4"

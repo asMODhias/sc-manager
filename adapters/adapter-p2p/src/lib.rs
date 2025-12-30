@@ -22,7 +22,7 @@ pub trait Signer {
 
 // Reuse the core KeyPair compatibility type
 use sc_manager_core::events::KeyPair as CoreKeyPair;
-use ed25519_dalek::{VerifyingKey, Signature, Verifier};
+use ed25519_dalek::{PublicKey, Signature, Verifier};
 use base64::Engine;
 
 /// Use the core KeyPair for generation/signing
@@ -37,7 +37,10 @@ impl Identity for CoreKeyPair {
 
 impl Signer for CoreKeyPair {
     fn sign(&self, data: &str) -> String {
-        let sig_bytes = self.sign(data.as_bytes());
+        let sig_bytes = match self.sign(data.as_bytes()) {
+            Ok(b) => b,
+            Err(e) => { tracing::error!("CoreKeyPair::sign failed: {}", e); return String::new(); }
+        };
         base64::engine::general_purpose::STANDARD.encode(sig_bytes)
     }
 }
@@ -60,7 +63,7 @@ impl SignedEvent {
             Ok(a) => a,
             Err(_) => return false,
         };
-        let vk = match VerifyingKey::from_bytes(&pk_arr) {
+        let vk = match PublicKey::from_bytes(&pk_arr) {
             Ok(v) => v,
             Err(_) => return false,
         };
@@ -68,7 +71,10 @@ impl SignedEvent {
             Ok(a) => a,
             Err(_) => return false,
         };
-        let sig = Signature::from_bytes(&sig_arr);
+        let sig = match Signature::from_bytes(&sig_arr) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
         vk.verify(self.payload.as_bytes(), &sig).is_ok()
     }
 }
@@ -82,14 +88,15 @@ pub use transport::{TransportMessage, Transport, InMemoryTransportRegistry, Mock
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc;
-    use std::thread;
+    use sc_manager_core::events::KeyPair as CoreKeyPair;
+    use base64::Engine;
 
     #[test]
     fn keypair_can_sign_and_verify() {
-        let kp = KeyPair::generate().expect("generate keypair in test");
+        let kp = CoreKeyPair::generate().expect("generate keypair in test");
         let payload = "payload-123";
-        let sig = kp.sign(payload);
+        let sig_bytes = kp.sign(payload.as_bytes()).expect("sign");
+        let sig = base64::engine::general_purpose::STANDARD.encode(sig_bytes);
         let ev = SignedEvent {
             id: "e1".to_string(),
             payload: payload.to_string(),

@@ -3,7 +3,7 @@ use sc_manager_app::in_memory_member_repo::InMemoryMemberRepo;
 use sc_manager_app::in_memory_role_repo::InMemoryRoleRepo;
 use sc_manager_app::in_memory_permission_repo::InMemoryPermissionRepo;
 use sc_manager_core::domain::Role;
-use sc_manager_core::repositories::{MemberRepository, RoleRepository, PermissionRepository, RepositoryError};
+use sc_manager_core::repositories::{MemberRepository, RoleRepository, RepositoryError};
 
 #[test]
 fn assign_role_requires_permission_and_respects_scope() {
@@ -24,9 +24,9 @@ fn assign_role_requires_permission_and_respects_scope() {
     // ensure actor has no roles initially
     assert_eq!(policy_member_repo.get("actor").unwrap().roles.len(), 0);
     // verify PolicyService directly
-    assert_eq!(sc_manager_app::services::policy_service::PolicyService::check_permission("actor", "member.assign_role", None, &policy_member_repo, &role_repo, &perm_repo).unwrap(), false);
+    assert!(!sc_manager_app::services::policy_service::PolicyService::check_permission("actor", "member.assign_role", None, &policy_member_repo, &role_repo, &perm_repo).unwrap());
     // without permission -> unauthorized
-    let res = handler.assign_role_with_auth("actor", "target", "r1", None, &policy_member_repo, &role_repo, &perm_repo);
+    let res = handler.assign_role_with_auth("actor", "target", "r1", None, (&policy_member_repo, &role_repo, &perm_repo));
     println!("DEBUG initial assign res={:?}", res);
     assert_eq!(res.unwrap_err(), RepositoryError::Unauthorized);
 
@@ -39,7 +39,7 @@ fn assign_role_requires_permission_and_respects_scope() {
     policy_member_repo.update(actor_m).unwrap();
 
     // now should be allowed
-    let res = handler.assign_role_with_auth("actor", "target", "r1", None, &policy_member_repo, &role_repo, &perm_repo);
+    let res = handler.assign_role_with_auth("actor", "target", "r1", None, (&policy_member_repo, &role_repo, &perm_repo));
     assert!(res.is_ok());
 
     // scoped permission: replace global assignment with a scoped role for actor
@@ -53,11 +53,11 @@ fn assign_role_requires_permission_and_respects_scope() {
     policy_member_repo.update(actor_m).unwrap();
 
     // attempt to assign role with resource orgY -> should be unauthorized
-    let res = handler.assign_role_with_auth("actor", "target", "r2", Some("orgY".to_string()), &policy_member_repo, &role_repo, &perm_repo);
+    let res = handler.assign_role_with_auth("actor", "target", "r2", Some("orgY".to_string()), (&policy_member_repo, &role_repo, &perm_repo));
     println!("DEBUG scoped assign res(orgY)={:?}", res);
     assert_eq!(res.unwrap_err(), RepositoryError::Unauthorized);
 
     // assign with correct scope -> allowed
-    let res = handler.assign_role_with_auth("actor", "target", "r2", Some("orgX".to_string()), &policy_member_repo, &role_repo, &perm_repo);
+    let res = handler.assign_role_with_auth("actor", "target", "r2", Some("orgX".to_string()), (&policy_member_repo, &role_repo, &perm_repo));
     assert!(res.is_ok());
 }

@@ -31,6 +31,12 @@ impl InMemoryRepo {
     }
 }
 
+impl Default for InMemoryRepo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Repository for InMemoryRepo {
     fn insert(&self, rec: Record) {
         let mut map = match self.data.lock() {

@@ -6,7 +6,7 @@ use sc_manager_app::in_memory_role_repo::InMemoryRoleRepo;
 use sc_manager_app::in_memory_permission_repo::InMemoryPermissionRepo;
 use sc_manager_app::services::session_service::SessionService;
 use sc_manager_core::domain::Role;
-use sc_manager_core::repositories::{MemberRepository, RoleRepository, PermissionRepository};
+use sc_manager_core::repositories::{MemberRepository, RoleRepository};
 
 #[test]
 fn session_start_requires_permission_and_updates_activity() {
@@ -15,7 +15,7 @@ fn session_start_requires_permission_and_updates_activity() {
     let mut event_repo = InMemoryEventRepo::new();
     let mut member_repo = InMemoryMemberRepo::new();
     let mut role_repo = InMemoryRoleRepo::new();
-    let mut perm_repo = InMemoryPermissionRepo::new();
+    let perm_repo = InMemoryPermissionRepo::new();
 
     // create member m1 and add to repos
     member_repo.add(sc_manager_core::domain::Member::new("m1")).unwrap();

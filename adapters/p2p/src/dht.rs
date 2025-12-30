@@ -19,6 +19,12 @@ impl InMemoryDht {
     }
 }
 
+impl Default for InMemoryDht {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DhtRegistry for InMemoryDht {
     fn announce(&self, id: &str, public_key_b64: &str) {
         match self.map.lock() {

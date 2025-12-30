@@ -33,6 +33,10 @@ impl DataAdapter for InMemoryDiscordAdapter {
     fn cache_ttl(&self) -> Duration { Duration::from_secs(30) }
 }
 
+impl Default for InMemoryDiscordAdapter {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

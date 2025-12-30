@@ -19,6 +19,7 @@ async fn metrics_endpoint_exposes_adapter_metrics() {
     // Build router with metrics route
     let app = Router::new()
         .route("/metrics", get(handlers::metrics_handler))
+        .layer(Extension(registry))
         .layer(Extension(Arc::new(metrics)));
 
     // Wait a bit for at least one publish

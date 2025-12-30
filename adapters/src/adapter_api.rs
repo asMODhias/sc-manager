@@ -80,6 +80,10 @@ impl AdapterScheduler {
     }
 }
 
+impl Default for AdapterScheduler {
+    fn default() -> Self { Self::new() }
+}
+
 pub struct HealthMonitor;
 impl HealthMonitor {
     pub fn new() -> Self { HealthMonitor }
@@ -87,7 +91,12 @@ impl HealthMonitor {
     pub async fn start(&self) -> Result<()> { Ok(()) }
 }
 
+impl Default for HealthMonitor {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
+#[allow(clippy::items_after_test_module, clippy::type_complexity, clippy::await_holding_lock)]
 mod reg_tests {
     use super::*;
     use std::sync::{Arc, Mutex};
@@ -95,9 +104,11 @@ mod reg_tests {
     use std::future::Future;
     use tokio::time::Duration;
 
-    struct MockPublisher { events: Arc<Mutex<Vec<(String, Vec<u8>)>>> }
+    type MsgList = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+
+    struct MockPublisher { events: MsgList }
     impl MockPublisher { fn new() -> Self { Self { events: Arc::new(Mutex::new(Vec::new())) } }
-    fn events(&self) -> Arc<Mutex<Vec<(String, Vec<u8>)>>> { self.events.clone() }
+    fn events(&self) -> MsgList { self.events.clone() }
     }
 
     impl EventPublisher for MockPublisher {
@@ -167,6 +178,7 @@ mod reg_tests {
             Err(e) => { tracing::error!("events mutex poisoned in test: {}", e); panic!("events mutex poisoned"); }
         }; 
         assert!(!guard.is_empty(), "No events published by adapter scheduler");
+        drop(guard);
 
         // Also test the direct fetch_and_update method
         let publisher2 = MockPublisher::new();
@@ -354,6 +366,12 @@ impl AdapterRegistry {
             }
         }
         health
+    }
+}
+
+impl Default for AdapterRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

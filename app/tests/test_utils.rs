@@ -59,3 +59,9 @@ impl sc_manager_core::repositories::OrganizationRepository for InMemoryOrganizat
         }
     }
 }
+
+impl Default for InMemoryOrganizationRepo {
+    fn default() -> Self {
+        Self::new()
+    }
+}

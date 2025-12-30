@@ -9,9 +9,9 @@ fn transport_core_signed_event_roundtrip() {
     let b = MockQuicTransport::new("node-b", reg.clone());
 
     // Use the deterministic test keypair from core (same secret) for signing
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let ev = DomainEventPayload { id: "evt-01".into(), kind: "UserCreated".into(), payload: json!({"user":"alice"}) };
-    let s: SignedEvent = sign_event(&kp, &ev);
+    let s: SignedEvent = sign_event(&kp, &ev).expect("sign event");
 
     // Send core SignedEvent JSON over the MockQuicTransport
     let bytes = serde_json::to_vec(&s).expect("serialize core signed event");

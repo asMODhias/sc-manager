@@ -17,7 +17,7 @@ async fn events_handler(
     Extension(nats_client): Extension<Arc<nats::NatsClient>>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
-    use sc_manager_core::events::{DomainEventPayload, sign_event, KeyPair};
+    use sc_manager_core::events::{DomainEventPayload, sign_event};
     use uuid::Uuid;
 
     let subj = "domain.events";
@@ -104,11 +104,11 @@ async fn main() {
                 // Try to parse payload as JSON, fallback to base64 raw
                 let val: serde_json::Value = match serde_json::from_slice(&payload) {
                     Ok(v) => v,
-                    Err(_) => serde_json::json!({"raw_b64": base64::engine::general_purpose::STANDARD.encode(&payload)})
+                    Err(_) => serde_json::json!({"raw_b64": base64::engine::general_purpose::STANDARD.encode(payload)})
                 };
                 use sc_manager_core::events::{DomainEventPayload, sign_event};
                 let ev = DomainEventPayload { id: uuid::Uuid::new_v4().to_string(), kind: subj, payload: val };
-                let signed = sign_event(&*kp, &ev).map_err(|e| e.to_string())?;
+                let signed = sign_event(&kp, &ev).map_err(|e| e.to_string())?;
                 let b = serde_json::to_vec(&signed).map_err(|e| e.to_string())?;
                 client.publish("domain.events", &b).await.map_err(|e| e.to_string())
             })

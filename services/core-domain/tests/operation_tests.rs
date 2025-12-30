@@ -9,7 +9,7 @@ fn sign_and_verify_operation_event() {
         payload: json!({"operation_id":"op1","name":"Recon","org_id":"org-1"}),
     };
 
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let signed = sign_event(&kp, &payload).expect("sign event");
     assert!(verify_signature(&signed));
 }
@@ -22,7 +22,7 @@ fn publish_signed_operation_event_roundtrip() {
         payload: json!({"operation_id":"op2","org_id":"org-1"}),
     };
 
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
     let signed = sign_event(&kp, &payload).expect("sign event");
 
     // Serialize/deserialize roundtrip (simulate publish as JSON)

@@ -57,7 +57,7 @@ pub fn parse_mission_suggestion(line: &str) -> Option<MissionCompletionSuggestio
 /// Parse a reader line-by-line and collect suggestions. Streaming-friendly.
 pub fn parse_reader<R: BufRead>(reader: R) -> Vec<MissionCompletionSuggestion> {
     let mut suggestions = Vec::new();
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if let Some(s) = parse_mission_suggestion(&line) {
             suggestions.push(s);
         }
@@ -75,8 +75,7 @@ pub fn parse_file(path: &std::path::Path) -> Result<Vec<MissionCompletionSuggest
 #[cfg(test)]
 mod mission_tests {
     use super::*;
-    use std::path::PathBuf;
-
+    
     #[test]
     fn parse_valid_mission_line() {
         let line = "2025-12-27T20:34:12Z - Member Alpha_One completed mission Wikelo Delivery";

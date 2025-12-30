@@ -47,6 +47,12 @@ impl InMemoryTransportRegistry {
     }
 }
 
+impl Default for InMemoryTransportRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Mock QUIC transport backed by in-process channels
 pub struct MockQuicTransport {
     id: String,
@@ -84,17 +90,16 @@ impl Iterator for MockTransportIter {
     type Item = TransportMessage;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.rx.recv() {
-            Ok(m) => Some(m),
-            Err(_) => None,
-        }
+            self.rx.recv().ok()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{KeyPair, SignedEvent, Signer};
+    use sc_manager_core::events::KeyPair;
+    use crate::SignedEvent;
+    use base64::Engine;
 
     #[test]
     fn transport_send_receive_direct() {
@@ -122,7 +127,8 @@ mod tests {
         // See docs/TRACKED_TODOS.md#TRACKED-001
         let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "op:announce".to_string();
-        let sig = kp.sign(payload);
+        let sig_bytes = kp.sign(payload.as_bytes()).expect("sign");
+        let sig = base64::engine::general_purpose::STANDARD.encode(sig_bytes);
         let ev = SignedEvent { id: "s1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };
         // TODO(SOT) [TRACKED-001]: Replace unwrap-style usage with proper error handling to avoid panics in production.
         // See docs/TRACKED_TODOS.md#TRACKED-001
