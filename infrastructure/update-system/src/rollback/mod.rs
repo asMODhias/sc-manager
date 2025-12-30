@@ -24,7 +24,11 @@ pub fn create_backup(path: &Path) -> Result<PathBuf, RollbackError> {
 /// 1. If `dest` exists, move it to `dest.key.json.bak.<ts>` (backup).
 /// 2. Rename `tmp` to `dest` (atomic where supported).
 /// 3. On failure, attempt to restore backup.
-/// Returns `Ok(Some(backup_path))` if backup was created, `Ok(None)` if no prior `dest` existed.
+///
+/// Returns:
+///
+/// - `Ok(Some(backup_path))` if a backup was created.
+/// - `Ok(None)` if no prior `dest` existed.
 pub fn transactional_replace(tmp: &Path, dest: &Path) -> Result<Option<PathBuf>, RollbackError> {
     let backup_path = if dest.exists() {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();

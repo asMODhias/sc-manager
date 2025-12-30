@@ -134,7 +134,7 @@ mod tests {
         let m = client.fetch_manifest(&manifest_url).unwrap();
         assert!(client.verify_manifest(&m).unwrap());
 
-        let mut tmp = NamedTempFile::new().unwrap();
+        let tmp = NamedTempFile::new().unwrap();
         client.download_and_verify(&m.payload_url, tmp.path(), &m.payload_sha3_hex).unwrap();
     }
 }
