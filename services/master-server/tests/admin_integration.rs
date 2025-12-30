@@ -1,5 +1,4 @@
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::StatusCode;
 use reqwest::Client;
 use std::net::TcpListener;
 use std::sync::Arc;
