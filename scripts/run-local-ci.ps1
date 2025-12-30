@@ -8,9 +8,28 @@ Get-ChildItem -Path . -Recurse -Filter Cargo.toml | Where-Object { $_.FullName -
     cargo fmt --manifest-path $manifest -- --check
 }
 
+Write-Host "==> Preflight: protoc check"
+# Check for protoc binary or PROTOC env var; if missing, skip crates that require protoc (prost)
+$protocFound = $false
+if ($env:PROTOC) {
+    if (Test-Path $env:PROTOC) { $protocFound = $true }
+} else {
+    if (Get-Command protoc -ErrorAction SilentlyContinue) { $protocFound = $true }
+}
+if (-not $protocFound) {
+    Write-Host "[warn] protoc not found. Crates that require `protoc` (prost) will be skipped. Install protoc or set PROTOC env var to enable them." -ForegroundColor Yellow
+    $skipProtoc = $true
+} else {
+    $skipProtoc = $false
+}
+
 Write-Host "==> Clippy (per-crate)"
 Get-ChildItem -Path . -Recurse -Filter Cargo.toml | Where-Object { $_.FullName -notmatch '\\patches\\|\\artifacts\\' } | ForEach-Object {
     $manifest = $_.FullName
+    if ($skipProtoc -and $manifest -match 'p2p') {
+        Write-Host "Skipping $manifest (requires protoc)"
+        return
+    }
     Write-Host "Clippy $manifest"
     cargo clippy --manifest-path $manifest --all-targets -- -D warnings
 }

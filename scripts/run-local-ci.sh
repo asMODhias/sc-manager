@@ -8,8 +8,32 @@ cd "$ROOT_DIR"
 echo "==> Formatting check"
 cargo fmt -- --check
 
+echo "==> Preflight: protoc check"
+PROTOC_FOUND=0
+if [ -n "${PROTOC:-}" ]; then
+  if [ -x "${PROTOC}" ]; then
+    PROTOC_FOUND=1
+  fi
+elif command -v protoc >/dev/null 2>&1; then
+  PROTOC_FOUND=1
+fi
+if [ "$PROTOC_FOUND" -eq 0 ]; then
+  echo "[warn] protoc not found. Crates requiring protoc (prost) will be skipped. Install protoc or set PROTOC env var to enable them."
+  SKIP_PROTOC=1
+else
+  SKIP_PROTOC=0
+fi
+
 echo "==> Clippy"
-cargo clippy --workspace --all-targets -- -D warnings
+# Run clippy per-crate so we can skip protos when protoc is missing
+find . -name Cargo.toml -not -path "./patches/*" -not -path "./artifacts/*" -print0 | while IFS= read -r -d '' manifest; do
+  if [ "$SKIP_PROTOC" -eq 1 ] && echo "$manifest" | grep -q "p2p"; then
+    echo "Skipping $manifest (requires protoc)"
+    continue
+  fi
+  echo "Clippy $manifest"
+  cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+done
 
 echo "==> Run core tests"
 pushd core >/dev/null
