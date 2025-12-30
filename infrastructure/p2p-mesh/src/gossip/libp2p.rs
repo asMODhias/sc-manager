@@ -13,6 +13,7 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender}, Mutex};
+use rand::Rng;
 
 // Discovery broker shared across both stub and real libp2p paths so that announcements
 // always use the *actual* listen addr as observed (not the provided `/tcp/0` placeholder).
@@ -431,16 +432,18 @@ async fn spawn_tcp_stub(
                         let port: u16 = parts[3].parse().unwrap_or(0);
                         let socket = format!("{}:{}", ip, port);
 
-                        // Spawn a background task to attempt dialing with exponential backoff
+                        // Spawn a background task to attempt dialing with jittered exponential backoff
+                        // and persistent re-attempts (do not permanently break — continue slow retries)
                         let peers_ctrl_clone = Arc::clone(&peers_ctrl);
                         let update_tx_clone = update_tx_ctrl.clone();
                         tokio::spawn(async move {
                             let mut attempt: u32 = 0;
-                            let max_attempts: u32 = 5;
+                            let max_attempts_fast: u32 = 5;
                             let mut backoff = Duration::from_millis(50);
                             loop {
                                 attempt += 1;
                                 eprintln!("gossip: dial attempt #{} to {}", attempt, socket);
+
                                 match tokio::time::timeout(Duration::from_secs(1), tokio::net::TcpStream::connect(&socket)).await {
                                     Ok(Ok(stream)) => {
                                         eprintln!("gossip: dial succeeded to {} after {} attempts", socket, attempt);
@@ -481,7 +484,12 @@ async fn spawn_tcp_stub(
                                         });
 
                                         let _ = update_tx_clone.send(GossipUpdate::PeerConnected(peer_addr.to_string()));
-                                        break;
+                                        // reset attempt/backoff after success
+                                        attempt = 0;
+                                        backoff = Duration::from_millis(50);
+                                        // stay in loop to handle potential disconnects later
+                                        tokio::time::sleep(Duration::from_millis(10)).await;
+                                        continue;
                                     }
                                     Ok(Err(e)) => {
                                         eprintln!("gossip: dial error to {}: {:?}", socket, e);
@@ -491,14 +499,72 @@ async fn spawn_tcp_stub(
                                     }
                                 }
 
-                                if attempt >= max_attempts {
-                                    eprintln!("gossip: giving up dialing {} after {} attempts", socket, attempt);
-                                    break;
-                                }
+                                // If we've done a number of fast attempts, slow down and switch to periodic trials
+                                if attempt >= max_attempts_fast {
+                                    eprintln!("gossip: reached fast-attempt limit for {}, switching to slow retry loop", socket);
+                                    // slow long-running reattempt loop with jitter
+                                    loop {
+                                        let jitter = rand::thread_rng().gen_range(0..100);
+                                        let wait = std::cmp::min(backoff * 2, Duration::from_secs(5)) + Duration::from_millis(jitter);
+                                        eprintln!("gossip: slow retry sleeping {:?} before next dial to {}", wait, socket);
+                                        tokio::time::sleep(wait).await;
 
-                                // backoff and retry
-                                tokio::time::sleep(backoff).await;
-                                backoff = std::cmp::min(backoff * 2, Duration::from_secs(2));
+                                        match tokio::time::timeout(Duration::from_secs(1), tokio::net::TcpStream::connect(&socket)).await {
+                                            Ok(Ok(stream)) => {
+                                                eprintln!("gossip: dial succeeded to {} after slow retry", socket);
+                                                let peer_addr = stream.peer_addr().unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap());
+                                                let (tx, mut rx) = unbounded_channel::<Vec<u8>>();
+                                                peers_ctrl_clone.lock().await.insert(peer_addr, tx);
+
+                                                // Spawn reader
+                                                let update_tx_r = update_tx_clone.clone();
+                                                let (mut reader, mut writer) = tokio::io::split(stream);
+                                                tokio::spawn(async move {
+                                                    let mut len_buf = [0u8; 4];
+                                                    loop {
+                                                        if let Err(_) = reader.read_exact(&mut len_buf).await { break; }
+                                                        let len = u32::from_be_bytes(len_buf) as usize;
+                                                        let mut buf = vec![0u8; len];
+                                                        if let Err(_) = reader.read_exact(&mut buf).await { break; }
+                                                        if let Ok(msg) = serde_json::from_slice::<HashGossipMessage>(&buf) {
+                                                            eprintln!("stub: client read message from peer_id={} entity_id={}", msg.peer_id, msg.entity_id);
+                                                            let _ = update_tx_r.send(GossipUpdate::HashReceived {
+                                                                peer_id: msg.peer_id.clone(),
+                                                                entity_id: msg.entity_id.clone(),
+                                                                hash: msg.state_hash.clone(),
+                                                            });
+                                                        }
+                                                    }
+                                                });
+
+                                                // Spawn writer
+                                                tokio::spawn(async move {
+                                                    while let Some(msg) = rx.recv().await {
+                                                        let len = (msg.len() as u32).to_be_bytes();
+                                                        eprintln!("stub: client writer sending {} bytes to {}", msg.len(), peer_addr);
+                                                        if let Err(e) = writer.write_all(&len).await { eprintln!("stub: client writer write len failed: {:?}", e); break; }
+                                                        if let Err(e) = writer.write_all(&msg).await { eprintln!("stub: client writer write msg failed: {:?}", e); break; }
+                                                    }
+                                                });
+
+                                                let _ = update_tx_clone.send(GossipUpdate::PeerConnected(peer_addr.to_string()));
+                                                // on success, break back to fast loop behaviour
+                                                attempt = 0;
+                                                backoff = Duration::from_millis(50);
+                                                break;
+                                            }
+                                            _ => {
+                                                // continue slow retries until success
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // add small jitter to avoid thundering herd
+                                    let jitter = rand::thread_rng().gen_range(0..50);
+                                    let sleep_for = std::cmp::min(backoff * 2, Duration::from_secs(2)) + Duration::from_millis(jitter);
+                                    tokio::time::sleep(sleep_for).await;
+                                    backoff = std::cmp::min(backoff * 2, Duration::from_secs(2));
+                                }
                             }
                         });
                     } // end if parts.len() check
@@ -605,7 +671,7 @@ mod tests {
         let k = identity::Keypair::generate_ed25519();
         let (ctrl, mut rx) = new_and_run(k.clone(), Some("/ip4/127.0.0.1/tcp/0".parse().unwrap())).await.expect("node start");
 
-        // Wait for LocalListenAddr and then construct a target addr on an arbitrary high port
+        // Wait for LocalListenAddr and then construct a target port to use later
         let mut node_addr = None;
         for _ in 0..20 {
             if let Some(msg) = rx.recv().await {
@@ -618,17 +684,34 @@ mod tests {
         }
         let _node_addr = node_addr.expect("node listen addr");
 
-        // Use a likely-unused port for dialing
-        let bad_addr: libp2p::core::Multiaddr = "/ip4/127.0.0.1/tcp/54321".parse().unwrap();
-        ctrl.send(Control::Dial(bad_addr)).expect("dial send");
+        // Find an available port by binding and dropping a listener
+        let temp = std::net::TcpListener::bind("127.0.0.1:0").expect("bind temp");
+        let port = temp.local_addr().unwrap().port();
+        drop(temp);
 
-        // Wait shortly to allow retries to attempt and then verify the node is still responsive
-        sleep(Duration::from_millis(500)).await;
+        let target_addr: libp2p::core::Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port).parse().unwrap();
+        ctrl.send(Control::Dial(target_addr.clone())).expect("dial send");
 
-        // Try a harmless publish to confirm control path still works
-        ctrl.send(Control::Publish(serde_json::to_vec(&HashGossipMessage { entity_id: "x".into(), state_hash: "h".into(), timestamp: 0, peer_id: "p".into() }).unwrap())).expect("publish send");
+        // After a short delay, start a real listener on that same port to emulate the peer coming online
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let _listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await.expect("bind back");
+            // keep listener alive for a short while
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        });
 
-        // If we get here without panic, the test passes
+        // The dialer should eventually connect; wait for PeerConnected event
+        use tokio::time::timeout;
+        let got = timeout(Duration::from_secs(3), async {
+            while let Some(u) = rx.recv().await {
+                if let GossipUpdate::PeerConnected(peer) = u {
+                    if !peer.is_empty() { return true; }
+                }
+            }
+            false
+        }).await;
+
+        assert!(matches!(got, Ok(true)), "expected PeerConnected after target came online");
     }
 }
 
