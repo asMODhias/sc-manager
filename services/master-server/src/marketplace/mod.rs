@@ -39,6 +39,11 @@ impl Marketplace {
         Marketplace { inner: RwLock::new(HashMap::new()), ledger: None }
     }
 
+    /// Provide a default implementation for clippy and ergonomic construction
+    pub fn default() -> Self {
+        Self::new()
+    }
+
     /// Persistent marketplace backed by NDJSON event file
     pub fn with_ledger(path: impl Into<PathBuf>) -> Result<Self, crate::marketplace::storage::MarketplaceStorageError> {
         let ledger = MarketplaceLedger::new(path);
@@ -55,6 +60,17 @@ impl Marketplace {
             }
         }
         Ok(Marketplace { inner: RwLock::new(map), ledger: Some(ledger) })
+    }
+
+    /// Compact persistent storage by writing an atomic snapshot and rotating the ledger.
+    pub async fn compact(&self) -> Result<(), MarketplaceError> {
+        if let Some(ref ledger) = self.ledger {
+            // capture current state
+            let state = self.inner.read().await.clone();
+            ledger.write_snapshot_atomic(&state).map_err(|e| MarketplaceError::Storage(e))?;
+            ledger.compact().map_err(|e| MarketplaceError::Storage(e))?;
+        }
+        Ok(())
     }
 
     pub async fn list_items(&self) -> Vec<Item> {
@@ -82,6 +98,12 @@ impl Marketplace {
         }
         m.insert(item.id.clone(), item);
         Ok(())
+    }
+}
+
+impl Default for Marketplace {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -124,10 +146,13 @@ mod tests {
         let p = tf.path().to_path_buf();
 
         // create marketplace with ledger and persist an item
-        let mp = Marketplace::with_ledger(&p).expect("create with ledger");
+        let mut mp = Marketplace::with_ledger(&p).expect("create with ledger");
         let s = Arc::new(mp);
         let it = Item { id: "item-persist".into(), owner: "carol".into(), price: 250, metadata: "{}".into() };
         s.insert_item(it.clone()).await.expect("insert ok");
+
+        // compact storage
+        s.compact().await.expect("compact ok");
 
         // create a new instance from same ledger and ensure item is present
         let mp2 = Marketplace::with_ledger(&p).expect("reload ledger");
@@ -135,5 +160,9 @@ mod tests {
         let list = s2.list_items().await;
         assert_eq!(list.len(), 1);
         assert_eq!(list[0], it);
+
+        // ensure snapshot file exists
+        let snap = crate::marketplace::storage::MarketplaceLedger::new(&p).snapshot_path();
+        assert!(snap.exists());
     }
 }

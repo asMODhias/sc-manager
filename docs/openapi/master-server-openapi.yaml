@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: SC Manager - Master Server API
+  version: 8.0.0
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/v1/updates:
+    post:
+      summary: Publish a signed update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEntry'
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+  /api/v1/audit/events:
+    get:
+      summary: List audit events
+      responses:
+        '200':
+          description: Audit events list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEvent'
+  /api/v1/marketplace/items:
+    get:
+      summary: List marketplace items
+      responses:
+        '200':
+          description: Marketplace items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+    post:
+      summary: Create marketplace item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreate'
+      responses:
+        '201': { description: Created }
+        '409': { description: Conflict - item exists }
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+        owner:
+          type: string
+        price:
+          type: integer
+        metadata:
+          type: string
+    ItemCreate:
+      type: object
+      required: [id, owner, price]
+      properties:
+        id:
+          type: string
+        owner:
+          type: string
+        price:
+          type: integer
+        metadata:
+          type: string
+    AuditEvent:
+      type: object
+      properties:
+        event_id: { type: string }
+        timestamp: { type: string }
+        event_type: { type: string }
+        source_hash: { type: string }
+        payload_hash: { type: string }
+        geo_region: { type: string }
+        software_version: { type: string }
+    UpdateEntry:
+      type: object
+      properties:
+        content_hash: { type: string }
+        version: { type: string }
+        channel: { type: string }
+        base_version: { type: string }
+        signature: { type: string }
+        changelog_url: { type: string }
+        bytes: { type: integer }
+        update_type: { type: string }
