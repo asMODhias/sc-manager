@@ -1,0 +1,22 @@
+name: Infrastructure — EventBus (NATS scaffold)
+
+on:
+  push:
+    paths:
+      - 'infrastructure/eventbus-nats/**'
+  pull_request:
+    paths:
+      - 'infrastructure/eventbus-nats/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Run eventbus-nats tests
+        run: cargo test --manifest-path infrastructure/eventbus-nats/Cargo.toml --quiet

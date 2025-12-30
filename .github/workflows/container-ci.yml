@@ -1,0 +1,40 @@
+name: Container CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  container-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure Docker available
+        run: docker info
+
+      - name: Build core image
+        run: docker build -t docker-core -f core/Dockerfile core
+
+      - name: Build adapters image
+        run: docker build -t docker-adapters -f adapters/Dockerfile adapters
+
+      - name: Build ui image
+        run: docker build -t docker-ui -f ui/Dockerfile ui
+
+      - name: Build e2e image
+        run: docker build -t docker-e2e -f e2e/Dockerfile e2e
+
+      - name: Run core tests
+        run: docker run --rm docker-core cargo test --verbose
+
+      - name: Run adapters tests
+        run: docker run --rm docker-adapters cargo test --verbose
+
+      - name: Run ui tests
+        run: docker run --rm docker-ui sh -c "npm test --prefix /usr/src/sc_manager_ui"
+
+      - name: Run e2e tests
+        run: docker run --rm docker-e2e sh -c "npx playwright test --reporter=list"

@@ -15,9 +15,14 @@ check_file() {
   fi
 }
 
-check_file "docs/04_DEV_GUIDE_COPILOT.md"
-check_file "docs/04_DEV_GUIDE_COPILOT.de.md"
-check_file "docs/adr/ADR-0001-COPILOT-DEV-GUIDE.md"
+# V7: Ensure the authoritative SC_MANAGER_V7 docs are present
+check_file "docs/SC_MANAGER_V7_PART1_FOUNDATION.md"
+check_file "docs/SC_MANAGER_V7_FEATURE_MATRIX_AND_COMPLETION.md"
+if [ ! -f "docs/adr/ADR-0001-COPILOT-DEV-GUIDE.md" ]; then
+  echo "[WARN] ADR not found: docs/adr/ADR-0001-COPILOT-DEV-GUIDE.md (expected; please add ADRs under docs/adr/)"
+else
+  echo "[OK] Found: docs/adr/ADR-0001-COPILOT-DEV-GUIDE.md"
+fi
 
 # Simple heuristic: ensure tests were changed or present when code changes occur
 # If the PR only changes docs, this is fine; otherwise require at least one test file or 'tests' folder

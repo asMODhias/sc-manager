@@ -4,7 +4,7 @@ use sc_manager_app::in_memory_permission_repo::InMemoryPermissionRepo;
 use sc_manager_app::handlers::fleet_handler::FleetHandler;
 use sc_manager_app::commands::CreateFleetCommand;
 use sc_manager_core::domain::Role;
-use sc_manager_core::repositories::{MemberRepository, RoleRepository, PermissionRepository, ShipRepository, RepositoryError};
+use sc_manager_core::repositories::{MemberRepository, RoleRepository, ShipRepository, RepositoryError};
 
 #[test]
 fn fleet_create_and_update_permissions() {
@@ -14,7 +14,7 @@ fn fleet_create_and_update_permissions() {
     ship_repo.register(sc_manager_core::domain::Ship::new("s100", "TestShip")).unwrap();
     let mut member_repo = InMemoryMemberRepo::new();
     let mut role_repo = InMemoryRoleRepo::new();
-    let mut perm_repo = InMemoryPermissionRepo::new();
+    let perm_repo = InMemoryPermissionRepo::new();
 
     member_repo.add(sc_manager_core::domain::Member::new("m1")).unwrap();
 

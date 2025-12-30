@@ -28,7 +28,7 @@ mod tests {
     async fn graphql_ping_works() {
         let schema = build_schema();
         let resp = schema.execute(Request::new("{ ping }")).await;
-        let data = resp.data.into_json().unwrap();
+        let data = resp.data.into_json().expect("graphql response data JSON");
         assert_eq!(data["ping"], "pong");
     }
 }

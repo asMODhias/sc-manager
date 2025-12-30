@@ -64,5 +64,5 @@ impl Member {
         self.org_id = None;
     }
 
-    // TODO: Add verification logic for RSI handle
+    // TODO: Add verification logic for RSI handle [TRACKED-004]
 }

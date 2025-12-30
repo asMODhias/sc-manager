@@ -42,6 +42,7 @@ Link to issue or feature in `docs/03_FEATURES_V1.md` if applicable.
 - [ ] ToS compliance verified and enforced at adapter layer if applicable
 - [ ] If deviating from the guide, an ADR is included or referenced
 - [ ] Local CI executed and green: run `scripts/run-local-ci.sh` (Linux/macOS) or `scripts/run-local-ci.ps1` (PowerShell) and confirm results
+- [ ] Coverage validated locally if changing code: `act -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:full-20.04 -j llvm-coverage` and confirm merged profdata or fallback ZIP is uploaded as artifact
 - [ ] If using the VS Code tasks, run the "Local CI (PowerShell)" or "Local CI (Bash)" tasks before opening the PR
 
 

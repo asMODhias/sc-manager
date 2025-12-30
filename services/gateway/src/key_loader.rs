@@ -17,7 +17,7 @@ pub fn load_gateway_keypair() -> Result<sc_manager_core::events::KeyPair, String
         return parse_key_bytes(&bytes);
     }
 
-    Ok(sc_manager_core::events::generate_test_keypair())
+    sc_manager_core::events::generate_test_keypair()
 }
 
 fn parse_key_bytes(bytes: &[u8]) -> Result<sc_manager_core::events::KeyPair, String> {
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn loads_env_b64_key() {
         let seed = [1u8; 32];
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&seed);
+        let b64 = base64::engine::general_purpose::STANDARD.encode(seed);
         env::set_var("GATEWAY_PRIVATE_KEY", b64);
         let kp = load_gateway_keypair().expect("load");
         assert_eq!(kp.secret_bytes, seed);
@@ -48,7 +48,7 @@ mod tests {
         env::remove_var("GATEWAY_PRIVATE_KEY");
         env::remove_var("GATEWAY_PRIVATE_KEY_FILE");
         let kp = load_gateway_keypair().expect("load");
-        let expected = sc_manager_core::events::generate_test_keypair();
+        let expected = sc_manager_core::events::generate_test_keypair().expect("generate test keypair");
         assert_eq!(kp.public_key_b64, expected.public_key_b64);
     }
 }

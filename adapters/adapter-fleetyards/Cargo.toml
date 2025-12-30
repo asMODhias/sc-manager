@@ -6,6 +6,9 @@ publish = false
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+csv = "1"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
-# Test helpers
+proptest = "1"

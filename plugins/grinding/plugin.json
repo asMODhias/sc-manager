@@ -1,0 +1,26 @@
+{
+  "id": "grinding",
+  "name": "Mission Grinding Tracker",
+  "version": "1.0.1",
+  "engine": ">=1.0.0",
+  "author": "SC Manager Team",
+  "description": "Track mission grinding progress, goals, and reputation (ToS-safe, no automation)",
+  "permissions": [
+    "read-events",
+    "read-data",
+    "storage-local",
+    "ui-render"
+  ],
+  "ui": true,
+  "main": "dist/index.js",
+  "routes": [
+    { "path": "/grinding", "component": "GrindingDashboard" },
+    { "path": "/grinding/suggestions", "component": "SuggestionQueue" },
+    { "path": "/grinding/settings", "component": "SettingsPanel" }
+  ],
+  "tos_compliance": {
+    "no_automation": true,
+    "manual_reporting_only": true,
+    "officer_verification_required": true
+  }
+}

@@ -47,6 +47,12 @@ impl InMemoryTransportRegistry {
     }
 }
 
+impl Default for InMemoryTransportRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Mock QUIC transport backed by in-process channels
 pub struct MockQuicTransport {
     id: String,
@@ -84,17 +90,16 @@ impl Iterator for MockTransportIter {
     type Item = TransportMessage;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.rx.recv() {
-            Ok(m) => Some(m),
-            Err(_) => None,
-        }
+            self.rx.recv().ok()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{KeyPair, SignedEvent, Signer};
+    use sc_manager_core::events::KeyPair;
+    use crate::SignedEvent;
+    use base64::Engine;
 
     #[test]
     fn transport_send_receive_direct() {
@@ -118,20 +123,23 @@ mod tests {
         let a = MockQuicTransport::new("node-a", reg.clone());
         let b = MockQuicTransport::new("node-b", reg.clone());
 
-        // TODO(SOT): Replace `.unwrap()` with error propagation or Result handling in production code.
+        // TODO(SOT) [TRACKED-001]: Replace unwrap-style usage with explicit error propagation or Result handling in production code.
+        // See docs/TRACKED_TODOS.md#TRACKED-001
         let kp = KeyPair::generate().expect("generate keypair in test");
         let payload = "op:announce".to_string();
-        let sig = kp.sign(payload);
+        let sig_bytes = kp.sign(payload.as_bytes()).expect("sign");
+        let sig = base64::engine::general_purpose::STANDARD.encode(sig_bytes);
         let ev = SignedEvent { id: "s1".into(), payload: payload.clone(), signer_id: kp.id.clone(), signature: sig };
-        // TODO(SOT): Replace `.unwrap()` with error handling to avoid panics in production.
+        // TODO(SOT) [TRACKED-001]: Replace unwrap-style usage with proper error handling to avoid panics in production.
+        // See docs/TRACKED_TODOS.md#TRACKED-001
         let bytes = serde_json::to_vec(&ev).expect("serialize event in test");
 
         a.send("node-b", bytes).expect("send ev");
 
         let mut it = b.subscribe();
-        // TODO(SOT): avoid using `.unwrap()` on iterator results; handle Option properly to avoid panics in production.
+        // TODO(SOT) [TRACKED-001]: avoid using direct unwrap-style iterator results; handle Option properly to avoid panics in production.
         let m = it.next().expect("should receive");
-        // TODO(SOT): replace `serde_json::from_slice(...).unwrap()` with proper error handling and return Result
+        // TODO(SOT) [TRACKED-001]: replace serde_json::from_slice(...) usage with proper error handling and returning a Result where appropriate
         let received_ev: SignedEvent = serde_json::from_slice(&m.payload).expect("deserialize event in test");
         // verify signature using public key from sender (simulated by having access to kp here)
         assert!(received_ev.verify(&kp));

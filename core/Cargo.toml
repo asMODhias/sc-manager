@@ -14,3 +14,4 @@ thiserror = "1.0"
 [dev-dependencies]
 # Add test helpers here
 criterion = "0.4"
+serde_json = "1"

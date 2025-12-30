@@ -1,11 +1,19 @@
 # Local CI for PowerShell
 $ErrorActionPreference = 'Stop'
 
-Write-Host "==> Formatting check"
-cargo fmt -- --check
+Write-Host "==> Formatting check (per-crate)"
+Get-ChildItem -Path . -Recurse -Filter Cargo.toml | Where-Object { $_.FullName -notmatch '\\patches\\|\\artifacts\\' } | ForEach-Object {
+    $manifest = $_.FullName
+    Write-Host "Formatting $manifest"
+    cargo fmt --manifest-path $manifest -- --check
+}
 
-Write-Host "==> Clippy"
-cargo clippy --workspace --all-targets -- -D warnings
+Write-Host "==> Clippy (per-crate)"
+Get-ChildItem -Path . -Recurse -Filter Cargo.toml | Where-Object { $_.FullName -notmatch '\\patches\\|\\artifacts\\' } | ForEach-Object {
+    $manifest = $_.FullName
+    Write-Host "Clippy $manifest"
+    cargo clippy --manifest-path $manifest --all-targets -- -D warnings
+}
 
 Write-Host "==> Run core tests"
 Push-Location core
@@ -17,9 +25,9 @@ Push-Location adapters
 cargo test --verbose
 Pop-Location
 
-Write-Host "==> Run app integration tests"
+Write-Host "==> Run app tests (unit + integration)"
 Push-Location app
-cargo test --test integration --verbose
+cargo test --verbose
 Pop-Location
 
 if (Test-Path -Path "./ui/package.json") {
@@ -47,5 +55,8 @@ if (Test-Path -Path "./e2e/package.json") {
 } else {
     Write-Host "==> Skipping E2E tests: no e2e/package.json"
 }
+
+Write-Host "==> Coverage fallback"
+& "$PSScriptRoot\coverage-fallback.ps1"
 
 Write-Host "Local CI finished."

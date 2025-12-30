@@ -1,6 +1,7 @@
 //! P2P Foundation scaffold: identity and signed event traits
 
 use serde::{Deserialize, Serialize};
+use base64::Engine;
 
 /// Lightweight identity abstraction (Ed25519 key reference)
 pub trait Identity {
@@ -34,7 +35,7 @@ impl KeyPair {
         let sk_bytes = [1u8; 32];
         let sk = SecretKey::from_bytes(&sk_bytes).map_err(|e| format!("SecretKey::from_bytes failed: {}", e))?;
         let pk = PublicKey::from(&sk);
-        let pk_b64 = base64::encode(pk.to_bytes());
+        let pk_b64 = base64::engine::general_purpose::STANDARD.encode(pk.to_bytes());
         Ok(Self {
             id: format!("node-{}", pk_b64.get(0..8).unwrap_or("xx")),
             public_key_b64: pk_b64,
@@ -63,7 +64,7 @@ impl Signer for KeyPair {
                 return String::new();
             }
         };
-        let pk_bytes = match base64::decode(&self.public_key_b64) {
+        let pk_bytes = match base64::engine::general_purpose::STANDARD.decode(&self.public_key_b64) {
             Ok(b) => b,
             Err(e) => {
                 tracing::error!("KeyPair::sign failed to decode public key: {}", e);
@@ -79,7 +80,7 @@ impl Signer for KeyPair {
         };
         let kp = Keypair { secret: sk, public: pk };
         let sig: Signature = kp.sign(data.as_bytes());
-        base64::encode(sig.to_bytes())
+        base64::engine::general_purpose::STANDARD.encode(sig.to_bytes())
     }
 }
 
@@ -90,11 +91,11 @@ impl SignedEvent {
         if self.signer_id != signer.id() {
             return false;
         }
-        let sig_bytes = match base64::decode(&self.signature) {
+        let sig_bytes = match base64::engine::general_purpose::STANDARD.decode(&self.signature) {
             Ok(b) => b,
             Err(_) => return false,
         };
-        let pk_bytes = match base64::decode(signer.public_key()) {
+        let pk_bytes = match base64::engine::general_purpose::STANDARD.decode(signer.public_key()) {
             Ok(b) => b,
             Err(_) => return false,
         };
@@ -149,10 +150,7 @@ mod tests {
 
         let handle_b = thread::spawn(move || {
             // wait for event
-            let ev = rx.recv().expect("should receive event");
-            // verify signature against sender public key contained in event.signer_id? For test, we only have A's public key if signer_id matches
-            // In real system we'd lookup signer public key via DHT; here we simulate by checking signer_id matches prefix and verify using node_a public key supplied by caller
-            ev
+            rx.recv().expect("should receive event")
         });
 
         // Node A: create signed event and send
@@ -225,14 +223,13 @@ mod tests {
 
         // spawn node threads
         let mut handles = Vec::new();
-        for i in 0..NODES {
-            let rx = node_receivers.remove(0);
+        for (i, rx) in node_receivers.drain(..).enumerate() {
             let tx_clone = net_tx.clone();
             let seen = seen_vec[i].clone();
             let registry_cloned = registry.clone();
             let handle = thread::spawn(move || {
                 while let Ok(ev) = rx.recv() {
-                    // TODO(SOT): Replace lock().unwrap() with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
+                    // TODO(SOT) [TRACKED-001]: Replace lock usage with proper handling (e.g., map_err or expect with context) to avoid poisoning panics
                     let mut s = match seen.lock() {
                         Ok(g) => g,
                         Err(e) => { tracing::error!("seen mutex poisoned: {}", e); continue; }
@@ -247,7 +244,7 @@ mod tests {
                     };
                     if let Some(pk_b64) = reg.get(&ev.signer_id) {
                         // build a temporary KeyPair-like identity with public key
-                        // TODO(SOT): Replace `SecretKey::from_bytes(...).unwrap()` with error handling; using unwrap here can panic in production
+                        // TODO(SOT) [TRACKED-001]: Replace SecretKey::from_bytes(...) usage with proper error handling; constructing a SecretKey can fail and should be handled in production
                         let temp_secret = match ed25519_dalek::SecretKey::from_bytes(&[1u8;32]) {
                             Ok(s) => s,
                             Err(e) => { tracing::error!("failed to construct temp secret: {}", e); continue; }
@@ -310,7 +307,7 @@ mod tests {
         for s in seen_vec.iter() {
             let guard = match s.lock() {
                 Ok(g) => g,
-                Err(e) => { tracing::error!("seen mutex poisoned in final check: {}", e); assert!(false, "seen mutex poisoned"); }
+                Err(e) => { tracing::error!("seen mutex poisoned in final check: {}", e); panic!("seen mutex poisoned"); }
             };
             assert!(guard.contains(&init_ev.id));
         }

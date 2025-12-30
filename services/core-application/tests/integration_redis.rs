@@ -17,7 +17,7 @@ async fn nats_to_redis_integration() {
 
     // Connect to Redis (async)
     let client = redis::Client::open(redis_url.as_str()).expect("create redis client");
-    let mut conn = client.get_tokio_connection().await.expect("redis connect");
+    let mut conn = client.get_multiplexed_async_connection().await.expect("redis connect");
 
     // Connect to NATS
     let nc = async_nats::connect(nats_url).await.expect("connect nats");
@@ -34,7 +34,7 @@ async fn nats_to_redis_integration() {
                 // store raw
                 let key = format!("it:events:{}", Uuid::new_v4());
                 let _: () = redis::cmd("SET").arg(&[&key, &s]).query_async(&mut conn).await.expect("redis set");
-                return Some(key);
+                Some(key)
             }
             _ => None,
         }
@@ -47,7 +47,7 @@ async fn nats_to_redis_integration() {
     let key = res.unwrap();
 
     // Now verify the key exists in Redis
-    let mut conn2 = client.get_tokio_connection().await.expect("redis connect2");
+    let mut conn2 = client.get_multiplexed_async_connection().await.expect("redis connect2");
     let val: Option<String> = redis::cmd("GET").arg(&[&key]).query_async(&mut conn2).await.expect("redis get");
     assert!(val.is_some(), "Expected value stored in Redis by test relay");
 }

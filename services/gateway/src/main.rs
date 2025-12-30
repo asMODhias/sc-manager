@@ -17,7 +17,7 @@ async fn events_handler(
     Extension(nats_client): Extension<Arc<nats::NatsClient>>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, (axum::http::StatusCode, String)> {
-    use sc_manager_core::events::{DomainEventPayload, sign_event, KeyPair};
+    use sc_manager_core::events::{DomainEventPayload, sign_event};
     use uuid::Uuid;
 
     let subj = "domain.events";
@@ -53,7 +53,17 @@ async fn main() {
     let app = Router::new()
         .route("/events", post(events_handler))
         .route("/health", axum::routing::get(crate::handlers::health_handler));
-    let addr: SocketAddr = std::env::var("GATEWAY_BIND").unwrap_or_else(|_| "0.0.0.0:8080".into()).parse().unwrap();
+    let bind = std::env::var("GATEWAY_BIND").unwrap_or_else(|_| "0.0.0.0:8080".into());
+    let addr: SocketAddr = match bind.parse() {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::error!("Invalid GATEWAY_BIND '{}': {}. Falling back to 0.0.0.0:8080", bind, e);
+            match "0.0.0.0:8080".parse() {
+                Ok(a) => a,
+                Err(e) => { eprintln!("Critical: default bind failed to parse: {}", e); std::process::exit(1); }
+            }
+        }
+    };
     info!("Gateway running on {}", addr);
 
     // Connect to NATS once and share the client with handlers
@@ -94,11 +104,11 @@ async fn main() {
                 // Try to parse payload as JSON, fallback to base64 raw
                 let val: serde_json::Value = match serde_json::from_slice(&payload) {
                     Ok(v) => v,
-                    Err(_) => serde_json::json!({"raw_b64": base64::engine::general_purpose::STANDARD.encode(&payload)})
+                    Err(_) => serde_json::json!({"raw_b64": base64::engine::general_purpose::STANDARD.encode(payload)})
                 };
                 use sc_manager_core::events::{DomainEventPayload, sign_event};
                 let ev = DomainEventPayload { id: uuid::Uuid::new_v4().to_string(), kind: subj, payload: val };
-                let signed = sign_event(&*kp, &ev).map_err(|e| e.to_string())?;
+                let signed = sign_event(&kp, &ev).map_err(|e| e.to_string())?;
                 let b = serde_json::to_vec(&signed).map_err(|e| e.to_string())?;
                 client.publish("domain.events", &b).await.map_err(|e| e.to_string())
             })
@@ -109,7 +119,10 @@ async fn main() {
     let metrics_registry = prometheus::Registry::new();
 
     let publisher = std::sync::Arc::new(NatsPublisher { client: nats_client.clone(), kp });
-    registry.start_all(Some(publisher), Some(std::sync::Arc::new(metrics_registry.clone()))).await.expect("start adapters");
+    if let Err(e) = registry.start_all(Some(publisher), Some(std::sync::Arc::new(metrics_registry.clone()))).await {
+        eprintln!("failed to start adapters: {}", e);
+        std::process::exit(1);
+    }
     let registry = std::sync::Arc::new(registry);
 
     // Attach the client, registry and metrics as axum Extensions
@@ -120,8 +133,11 @@ async fn main() {
         .layer(Extension(std::sync::Arc::new(metrics_registry.clone())));
 
     // Use axum-server for binding which provides a cross-platform helper
-    axum_server::bind(addr)
+    if let Err(e) = axum_server::bind(addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+    {
+        eprintln!("server error: {}", e);
+        std::process::exit(1);
+    }
 }

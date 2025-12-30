@@ -1,0 +1,22 @@
+name: Signature Tests
+
+on:
+  push:
+    branches: [ "develop", "main" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+jobs:
+  signature-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Run anonymization check
+        run: python3 scripts/check_unanonymized.py || (echo "Anonymization check failed" && exit 1)
+      - name: Run cargo tests (signature-focused)
+        run: cargo test --workspace --tests --quiet

@@ -18,9 +18,13 @@ sc_manager_core = { path = "../services/core-domain" }
 
 # Tokio runtime (used by scheduler tasks)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
-cron = "0.6"
+cron = "0.7"
 prometheus = "0.14"
 
 [dev-dependencies]
 # Keep tokio in dev-deps for tests (no-op if already present)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+
+[patch.crates-io]
+cron = { path = "../services/core-application/patches/cron" }
+nom = { path = "../services/core-application/patches/nom" }

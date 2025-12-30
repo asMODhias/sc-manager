@@ -77,12 +77,11 @@ impl<'a, R: MemberRepository> MemberHandler<'a, R> {
         member_id: &str,
         role_id: &str,
         scope: Option<String>,
-        member_repo: &M,
-        role_repo: &Rr,
-        perm_repo: &Pp,
+        repos: (&M, &Rr, &Pp),
     ) -> Result<(), RepositoryError> {
         // permission: member.assign_role, scoped by org if provided
         let resource = scope.as_deref();
+        let (member_repo, role_repo, perm_repo) = repos;
         let allowed = crate::services::policy_service::PolicyService::check_permission(
             actor,
             "member.assign_role",

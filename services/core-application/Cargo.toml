@@ -26,7 +26,7 @@ url = "2"
 sc_manager_adapters = { path = "../../adapters" }
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 # Redis (async) used in integration tests
-redis = { version = "0.24", features = ["tokio-comp"] }
+redis = { version = "0.32.7", features = ["tokio-comp"] }
 async-nats = "0.34"
 uuid = { version = "1", features = ["v4"] }
 # Stream utilities for async subscribers used in tests
@@ -35,3 +35,7 @@ futures-util = "0.3"
 [lib]
 name = "sc_manager_app"
 path = "src/lib.rs"
+
+[patch.crates-io]
+cron = { path = "patches/cron" }
+nom = { path = "patches/nom" }

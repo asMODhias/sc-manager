@@ -1,0 +1,66 @@
+name: Local CI
+
+on: [push, pull_request]
+
+jobs:
+  local-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run core tests
+        working-directory: ./core
+        run: cargo test --verbose
+
+      - name: Run master-server tests
+        working-directory: ./services/master-server
+        run: cargo test --verbose
+
+      - name: Run adapters tests
+        working-directory: ./adapters
+        run: cargo test --verbose
+
+      - name: Run app integration tests
+        working-directory: ./app
+        run: cargo test --test integration --verbose
+
+      - name: Setup Node (UI + E2E)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Run ui tests
+        working-directory: ./ui
+        run: npm ci && npm test --if-present
+
+      - name: Prepare E2E (npm deps)
+        working-directory: ./e2e
+        run: npm ci
+
+      - name: Prepare anonymized fixtures for E2E
+        working-directory: ./
+        run: |
+          python scripts/anonymize_game_log.py --in e2e/fixtures/raw_game.log --out e2e/fixtures/raw_game.anonymized.log --seed=ci
+          python scripts/anonymize_game_log.py --in e2e/fixtures/fleetyards_export.csv --out e2e/fixtures/fleetyards_export.anonymized.csv --seed=ci
+          python scripts/anonymize_game_log.py --in e2e/fixtures/erkul_dump.json --out e2e/fixtures/erkul_dump.anonymized.json --seed=ci
+          python scripts/import_fixtures.py --game e2e/fixtures/raw_game.anonymized.log --fleet e2e/fixtures/fleetyards_export.anonymized.csv --erkul e2e/fixtures/erkul_dump.anonymized.json --out e2e/testdata/testdata.json
+
+      - name: Install Playwright browsers
+        working-directory: ./e2e
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright E2E
+        working-directory: ./e2e
+        run: npx playwright test --reporter=github

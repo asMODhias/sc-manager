@@ -1,0 +1,21 @@
+name: TypeScript Lint (Biome)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  biome-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+      - name: Install deps (ui)
+        run: |
+          cd ui
+          pnpm install --frozen-lockfile || pnpm install
+      - name: Run Biome linter
+        run: |
+          cd ui
+          pnpm dlx biome check --quiet

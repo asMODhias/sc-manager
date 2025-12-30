@@ -6,7 +6,7 @@ use sc_manager_core::events::signing::{generate_test_keypair, verify_signature};
 #[test]
 fn create_operation_publishes_signed_event() {
     let bus = InMemoryEventBus::new();
-    let kp = generate_test_keypair();
+    let kp = generate_test_keypair().expect("generate test keypair");
 
     let cmd = CreateOperation { id: "op-1".into(), name: "Recon".into(), mission_type: "explore".into(), org_id: "org-1".into() };
 

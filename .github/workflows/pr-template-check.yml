@@ -1,0 +1,88 @@
+name: PR Template Compliance
+
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+
+jobs:
+  check-pr-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR body exists and includes Checklist
+        id: validate
+        env:
+          PR_BODY: "${{ github.event.pull_request.body }}"
+        run: |
+          echo "Checking PR body..."
+          if [ -z "$PR_BODY" ]; then
+            echo "MISSING_BODY=1" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Look for a 'Checklist' header or common checklist tokens
+          echo "$PR_BODY" | grep -i "Checklist" >/dev/null 2>&1 || grep -i "Tests added" >/dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "MISSING_CHECKLIST=1" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "PR template validation passed." 
+
+      - name: Notify author and fail if template invalid
+        if: steps.validate.outputs.MISSING_BODY == '1' || steps.validate.outputs.MISSING_CHECKLIST == '1'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const missingBody = (process.env.MISSING_BODY === '1');
+            const missingChecklist = (process.env.MISSING_CHECKLIST === '1');
+            const messages = [];
+            if (missingBody) messages.push('- Pull request body is empty. Please use the repository PR template and fill required sections.');
+            if (missingChecklist) messages.push('- Pull request body does not contain the required checklist or test information.');
+            const body = `Hi @${pr.user.login}, thanks for the PR! :wave:\n\nI noticed the PR template is incomplete:\n${messages.join('\n')}\n\nPlease update your PR using the template and make sure the **Checklist** and **Tests** sections are filled. See CONTRIBUTING: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CONTRIBUTING.md`;
+            await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: pr.number, body });
+            core.setFailed('PR template validation failed. Please update the PR body according to the CONTRIBUTING guidelines.');
+        env:
+          MISSING_BODY: ${{ steps.validate.outputs.MISSING_BODY }}
+          MISSING_CHECKLIST: ${{ steps.validate.outputs.MISSING_CHECKLIST }}
+
+      - name: Add 'needs-template' label if template invalid
+        if: steps.validate.outputs.MISSING_BODY == '1' || steps.validate.outputs.MISSING_CHECKLIST == '1'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const labelName = 'needs-template';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Ensure label exists in the repo
+            const { data: labels } = await github.rest.issues.listLabelsForRepo({ owner, repo });
+            if (!labels.find(l => l.name === labelName)) {
+              await github.rest.issues.createLabel({ owner, repo, name: labelName, color: 'd93f0b', description: 'Pull request needs PR template to be completed' });
+            }
+
+            // Add label to the PR
+            await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [labelName] });
+        env:
+          MISSING_BODY: ${{ steps.validate.outputs.MISSING_BODY }}
+          MISSING_CHECKLIST: ${{ steps.validate.outputs.MISSING_CHECKLIST }}
+
+      - name: Remove 'needs-template' label when template is valid
+        if: steps.validate.outputs.MISSING_BODY != '1' && steps.validate.outputs.MISSING_CHECKLIST != '1'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const labelName = 'needs-template';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            try {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: labelName });
+            } catch (e) {
+              // label not present - ignore
+              console.log('Label not present or could not be removed.');
+            }

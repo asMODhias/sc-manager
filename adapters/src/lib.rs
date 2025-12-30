@@ -17,12 +17,14 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
+    type MsgList = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+
     #[test]
     fn adapters_smoke() { assert_eq!(1 + 1, 2); }
 
-    struct MockPublisher { msgs: Arc<Mutex<Vec<(String, Vec<u8>)>>> }
+    struct MockPublisher { msgs: MsgList }
     impl MockPublisher { fn new() -> Self { Self { msgs: Arc::new(Mutex::new(Vec::new())) } }
-        fn messages(&self) -> Arc<Mutex<Vec<(String, Vec<u8>)>>> { self.msgs.clone() }
+        fn messages(&self) -> MsgList { self.msgs.clone() }
     }
     impl EventPublisher for MockPublisher {
         fn publish<'a>(&'a self, subject: &'a str, payload: Vec<u8>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {

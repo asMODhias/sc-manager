@@ -21,6 +21,20 @@ if (Test-Path -Path "./ui/package.json") {
     Write-Host "Skipping UI tests: ./ui not found or no package.json."
 }
 
+# Plugin tests (vitest)
+if (Test-Path -Path "./plugins/grinding/package.json") {
+    Write-Host "Running grinding plugin tests..."
+    Push-Location plugins/grinding
+    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+        pnpm test
+    } else {
+        npx vitest run
+    }
+    Pop-Location
+} else {
+    Write-Host "Skipping grinding plugin tests: not found."
+}
+
 # E2E tests (Playwright)
 if (Test-Path -Path "./e2e/package.json") {
     Write-Host "Running E2E tests (playwright)..."

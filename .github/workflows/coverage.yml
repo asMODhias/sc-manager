@@ -1,0 +1,90 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ "develop", "main" ]
+  pull_request:
+    branches: [ "develop", "main" ]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.23.0
+      - name: Run coverage per crate
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/coverage
+          # List of directories to run coverage in; expand as needed
+          DIRS=(core app adapters services/*)
+          for d in "${DIRS[@]}"; do
+            if [ -f "$d/Cargo.toml" ]; then
+              name=$(basename "$d")
+              echo "Running tarpaulin for $d (artifact: artifacts/coverage/${name}-tarpaulin.xml)"
+              (cd "$d" && cargo tarpaulin --out Xml --ignore-tests) > "artifacts/coverage/${name}-tarpaulin.log" 2>&1 || true
+              # move generated xml (if any)
+              if [ -f "tarpaulin-report.xml" ]; then
+                mv tarpaulin-report.xml "artifacts/coverage/${name}-tarpaulin.xml" || true
+              fi
+            fi
+          done
+          echo "Coverage runs complete. Check artifacts/coverage for reports."
+      - name: Check coverage thresholds
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/check_coverage_thresholds.sh || true
+          ./scripts/check_coverage_thresholds.sh
+
+  tarpaulin-coverage:
+    runs-on: ubuntu-latest
+    needs: coverage
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install tools (lcov, cargo-tarpaulin)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov genhtml || true
+          cargo install cargo-tarpaulin --version 0.23.0 || true
+      - name: Run tarpaulin per crate (LCOV)
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/coverage/lcov
+          DIRS=(core app adapters services/*)
+          for d in "${DIRS[@]}"; do
+            if [ -f "$d/Cargo.toml" ]; then
+              name=$(basename "$d")
+              echo "Running tarpaulin for $d"
+              (cd "$d" && cargo tarpaulin --out Lcov --ignore-tests) > "artifacts/coverage/${name}-tarpaulin.log" 2>&1 || true
+              # move generated lcov (if any)
+              if [ -f "lcov.info" ]; then
+                mv lcov.info "artifacts/coverage/lcov/${name}.info" || true
+              fi
+            fi
+          done
+      - name: Merge LCOV and generate HTML
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/generate-coverage-tarpaulin.sh || true
+          ./scripts/generate-coverage-tarpaulin.sh
+      - name: Upload LCOV and HTML artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarpaulin-coverage
+          path: |
+            artifacts/coverage/lcov/**
+            artifacts/coverage/html/**
+          if-no-files-found: warn
+
+

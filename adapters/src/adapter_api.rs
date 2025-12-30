@@ -80,6 +80,10 @@ impl AdapterScheduler {
     }
 }
 
+impl Default for AdapterScheduler {
+    fn default() -> Self { Self::new() }
+}
+
 pub struct HealthMonitor;
 impl HealthMonitor {
     pub fn new() -> Self { HealthMonitor }
@@ -87,7 +91,12 @@ impl HealthMonitor {
     pub async fn start(&self) -> Result<()> { Ok(()) }
 }
 
+impl Default for HealthMonitor {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
+#[allow(clippy::items_after_test_module, clippy::type_complexity, clippy::await_holding_lock)]
 mod reg_tests {
     use super::*;
     use std::sync::{Arc, Mutex};
@@ -95,9 +104,11 @@ mod reg_tests {
     use std::future::Future;
     use tokio::time::Duration;
 
-    struct MockPublisher { events: Arc<Mutex<Vec<(String, Vec<u8>)>>> }
+    type MsgList = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+
+    struct MockPublisher { events: MsgList }
     impl MockPublisher { fn new() -> Self { Self { events: Arc::new(Mutex::new(Vec::new())) } }
-    fn events(&self) -> Arc<Mutex<Vec<(String, Vec<u8>)>>> { self.events.clone() }
+    fn events(&self) -> MsgList { self.events.clone() }
     }
 
     impl EventPublisher for MockPublisher {
@@ -105,7 +116,8 @@ mod reg_tests {
             let subj = subject.to_string();
             let events = self.events.clone();
             Box::pin(async move {
-                // TODO(SOT): Replace `lock().unwrap()` with proper error handling to avoid poisoning panics in production
+                // TODO(SOT) [TRACKED-002]: Replace lock usage with proper error handling to avoid poisoning panics in production
+                // See docs/TRACKED_TODOS.md#TRACKED-002
                 let mut guard = match events.lock() {
                     Ok(g) => g,
                     Err(e) => {
@@ -164,8 +176,9 @@ mod reg_tests {
         let guard = match events.lock() {
             Ok(g) => g,
             Err(e) => { tracing::error!("events mutex poisoned in test: {}", e); panic!("events mutex poisoned"); }
-        };
+        }; 
         assert!(!guard.is_empty(), "No events published by adapter scheduler");
+        drop(guard);
 
         // Also test the direct fetch_and_update method
         let publisher2 = MockPublisher::new();
@@ -175,7 +188,7 @@ mod reg_tests {
         let guard2 = match events2.lock() {
             Ok(g) => g,
             Err(e) => { tracing::error!("events2 mutex poisoned in test: {}", e); panic!("events2 mutex poisoned"); }
-        };
+        }; 
         assert_eq!(guard2.len(), 1, "fetch_and_update did not publish expected event");
     }
 }
@@ -356,7 +369,14 @@ impl AdapterRegistry {
     }
 }
 
+impl Default for AdapterRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Helper: run fetch with retries and record minimal metrics
+#[allow(dead_code)]
 async fn run_fetch_with_retries(name: &str, adapter: &Arc<dyn DataAdapter>, publisher: &Option<std::sync::Arc<dyn EventPublisher>>, metric_handles: Option<std::sync::Arc<(prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::IntCounterVec, prometheus::HistogramVec)>>) {
     // Pass through the Option; the inner function will handle presence/absence of metrics gracefully
     run_fetch_with_retries_metrics(name, adapter, publisher, metric_handles).await;

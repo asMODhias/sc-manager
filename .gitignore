@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/target/
+**/*.profraw
+**/*.pdb
+**/*.exe
+
+# Node
+node_modules/
+**/node_modules/
+
+# Cargo locks in sub-crates (ignore generated locks from builds)
+**/Cargo.lock
+
+# Coverage / artifacts
+/artifacts/
+/artifacts/coverage/
+
+# IDE / editor
+.vscode/
+.devcontainer/
+
+# Temp / OS
+.DS_Store
+Thumbs.db
+
+# Test output
+**/tests/*.log
+
+# Local logs
+local-ci.log

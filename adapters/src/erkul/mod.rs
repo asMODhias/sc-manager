@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn fetch_empty_returns_ok() {
         let c = SimpleErkulClient::new();
-        let r = c.fetch_equipment(Some("orgX"), None).unwrap();
+        let r = c.fetch_equipment(Some("orgX"), None).expect("fetch_equipment returned Ok");
         assert!(r.is_empty());
     }
 
@@ -111,7 +111,7 @@ mod tests {
                 Equipment::new("eq2", "Shield", false),
             ],
         );
-        let r = c.fetch_equipment(Some("orgA"), None).unwrap();
+        let r = c.fetch_equipment(Some("orgA"), None).expect("fetch_equipment returned Ok");
         assert_eq!(r.len(), 2);
         assert_eq!(r[0].id, "eq1");
     }
@@ -120,7 +120,7 @@ mod tests {
     fn fetch_existing_equipment_by_ship() {
         let mut c = SimpleErkulClient::new();
         c.add_equipment_for_ship("si1", vec![Equipment::new("eq3", "Engine", true)]);
-        let r = c.fetch_equipment(None, Some("si1")).unwrap();
+        let r = c.fetch_equipment(None, Some("si1")).expect("fetch_equipment returned Ok");
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].id, "eq3");
     }
@@ -130,7 +130,7 @@ mod tests {
         let mut c = SimpleErkulClient::new();
         c.add_equipment_for_org("orgA", vec![Equipment::new("eq1", "Laser", true)]);
         c.add_equipment_for_ship("si1", vec![Equipment::new("eq2", "Shield", false)]);
-        let r = c.fetch_equipment(None, None).unwrap();
+        let r = c.fetch_equipment(None, None).expect("fetch_equipment returned Ok");
         assert_eq!(r.len(), 2);
     }
 

@@ -1,0 +1,85 @@
+name: E2E tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        run_mode: [local-binary, image]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start NATS (compose)
+        run: docker compose -f e2e/docker-compose.e2e.yml up -d nats
+
+      - name: Prepare gateway (matrix)
+        run: |
+          if [ "${{ matrix.run_mode }}" = "local-binary" ]; then
+            echo "Building gateway binary"
+            cargo build -p sc_manager_gateway --release
+            nohup ./target/release/sc_manager_gateway &>/dev/null &
+          else
+            echo "Building gateway docker image"
+            docker compose -f e2e/docker-compose.e2e.yml up -d --build gateway
+          fi
+
+      - name: Wait for gateway health
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sS http://127.0.0.1:8080/health | grep -q '"status":"ok"'; then
+              echo "gateway healthy"; exit 0
+            fi
+            echo "waiting for gateway..."; sleep 3
+          done
+          echo "gateway did not become healthy"; docker compose -f e2e/docker-compose.e2e.yml logs --no-color || true; exit 1
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run Playwright backend test
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --prefer-offline
+          npx playwright install --with-deps
+          npx playwright test tests/backend_smoke.spec.ts --reporter=json
+        env:
+          PLAYWRIGHT_HEADLESS: 1
+
+      - name: Collect Playwright artifacts
+        if: always()
+        run: |
+          mkdir -p e2e/test-results || true
+          # Copy Playwright json report if present
+          if [ -f e2e/playwright-report/json/report.json ]; then cp e2e/playwright-report/json/report.json e2e/test-results/playwright-report.json; fi
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-playwright
+          path: |
+            e2e/test-results/**
+            e2e/playwright-report/**
+            e2e/**/trace/**
+            e2e/**/videos/**
+            e2e/**/screenshots/**
+
+      - name: Dump compose logs
+        if: failure()
+        run: docker compose -f e2e/docker-compose.e2e.yml logs --no-color || true
+
+      - name: Tear down compose
+        if: always()
+        run: docker compose -f e2e/docker-compose.e2e.yml down -v
