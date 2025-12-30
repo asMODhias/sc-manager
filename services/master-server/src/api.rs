@@ -31,8 +31,36 @@ pub fn router(master: Arc<MasterServer>) -> Router {
     Router::new()
         .route("/api/v1/updates", post(handle_publish_update))
         .route("/api/v1/audit/events", get(handle_list_audit_events))
+        .route("/api/v1/marketplace/items", get(handle_marketplace_list).post(handle_marketplace_create))
         .route("/health", get(handle_health))
         .with_state(s)
+}
+
+/// List marketplace items
+pub async fn handle_marketplace_list(State(state): State<AppState>) -> Result<Json<Vec<crate::marketplace::Item>>, (StatusCode, String)> {
+    let mp = state.master.marketplace.clone();
+    let mp = mp.read().await;
+    let list = mp.list_items().await;
+    Ok(Json(list))
+}
+
+#[derive(Deserialize)]
+pub struct CreateItemPayload {
+    pub id: String,
+    pub owner: String,
+    pub price: u64,
+    pub metadata: String,
+}
+
+/// Create a marketplace item
+pub async fn handle_marketplace_create(State(state): State<AppState>, Json(payload): Json<CreateItemPayload>) -> Result<StatusCode, (StatusCode, String)> {
+    let item = crate::marketplace::Item { id: payload.id, owner: payload.owner, price: payload.price, metadata: payload.metadata };
+    let mp = state.master.marketplace.clone();
+    let mp = mp.read().await;
+    match mp.insert_item(item).await {
+        Ok(()) => Ok(StatusCode::CREATED),
+        Err(e) => Err((StatusCode::CONFLICT, format!("marketplace error: {}", e))),
+    }
 }
 
 /// Health check endpoint
