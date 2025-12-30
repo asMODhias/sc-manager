@@ -33,6 +33,8 @@ pub enum Control {
     Publish(Vec<u8>),
     /// Dial a multiaddr
     Dial(Multiaddr),
+    /// Add explicit gossipsub peer (force mesh entry)
+    AddPeer(PeerId),
 }
 
 #[derive(Debug, Error)]
@@ -167,6 +169,7 @@ let (control_tx, control_rx) = unbounded_channel::<Control>();
         let mut kad_rx_local = kad_rx; // move into task
         let keypair_kad = keypair.clone();
         let peer_id_kad = peer_id.clone();
+        let control_tx_kad = control_tx.clone();
         tokio::spawn(async move {
             use libp2p::kad::{Kademlia, store::MemoryStore, KademliaEvent};
             use std::str::FromStr;
@@ -192,6 +195,8 @@ let (control_tx, control_rx) = unbounded_channel::<Control>();
                             libp2p::swarm::SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                                 eprintln!("kademlia: connection established: {}", peer_id);
                                 let _ = update_tx_kad.send(GossipUpdate::PeerConnected(peer_id.to_string()));
+                                // Also inform gossipsub behaviour to add explicit peer to the mesh
+                                let _ = control_tx_kad.send(Control::AddPeer(peer_id));
                             }
                             libp2p::swarm::SwarmEvent::Behaviour(KademliaEvent::RoutingUpdated { peer, .. }) => {
                                 eprintln!("kademlia: routing updated for peer: {}", peer);
@@ -259,8 +264,10 @@ let (control_tx, control_rx) = unbounded_channel::<Control>();
                                 }
                             }
                             libp2p::swarm::SwarmEvent::Behaviour(libp2p::gossipsub::GossipsubEvent::Message { message, .. }) => {
+                                eprintln!("gossip: swarm received gossipsub message ({} bytes) from {:?}", message.data.len(), message.source);
                                 if let Ok(msg) = serde_json::from_slice::<HashGossipMessage>(&message.data) {
                                     let peer = message.source.map(|p| p.to_string()).unwrap_or_else(|| "".to_string());
+                                    eprintln!("gossip: parsed HashGossipMessage from peer {} entity {}", peer, msg.entity_id);
                                     let _ = up.send(GossipUpdate::HashReceived { peer_id: peer, entity_id: msg.entity_id.clone(), hash: msg.state_hash.clone() });
                                 }
                             }
@@ -281,7 +288,14 @@ let (control_tx, control_rx) = unbounded_channel::<Control>();
                             }
                             Some(Control::Publish(data)) => {
                                 eprintln!("gossip: publish requested ({} bytes)", data.len());
-                                if let Err(e) = swarm.behaviour_mut().publish(topic.clone(), data) { eprintln!("gossip: publish error: {:?}", e); }
+                                match swarm.behaviour_mut().publish(topic.clone(), data) {
+                                    Ok(mid) => eprintln!("gossip: publish ok: {:?}", mid),
+                                    Err(e) => eprintln!("gossip: publish error: {:?}", e),
+                                }
+                            }
+                            Some(Control::AddPeer(pid)) => {
+                                eprintln!("gossip: adding explicit peer {} to gossipsub mesh", pid);
+                                swarm.behaviour_mut().add_explicit_peer(&pid);
                             }
                             None => { break; }
                         }
@@ -371,6 +385,7 @@ async fn spawn_tcp_stub(
                                 let mut buf = vec![0u8; len];
                                 if let Err(_) = reader.read_exact(&mut buf).await { break; }
                                 if let Ok(msg) = serde_json::from_slice::<HashGossipMessage>(&buf) {
+                                    eprintln!("stub: listener read message from peer_id={} entity_id={}", msg.peer_id, msg.entity_id);
                                     let _ = update_tx_read.send(GossipUpdate::HashReceived {
                                         peer_id: msg.peer_id.clone(),
                                         entity_id: msg.entity_id.clone(),
@@ -420,6 +435,7 @@ async fn spawn_tcp_stub(
                                 let peer_addr = stream.peer_addr().unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap());
                                 let (tx, mut rx) = unbounded_channel::<Vec<u8>>();
                                 peers_ctrl.lock().await.insert(peer_addr, tx);
+                                eprintln!("gossip: inserted peer tx for {}", peer_addr);
 
                                 // Spawn reader
                                 let update_tx_r = update_tx_ctrl.clone();
@@ -432,6 +448,7 @@ async fn spawn_tcp_stub(
                                         let mut buf = vec![0u8; len];
                                         if let Err(_) = reader.read_exact(&mut buf).await { break; }
                                         if let Ok(msg) = serde_json::from_slice::<HashGossipMessage>(&buf) {
+                                            eprintln!("stub: client read message from peer_id={} entity_id={}", msg.peer_id, msg.entity_id);
                                             let _ = update_tx_r.send(GossipUpdate::HashReceived {
                                                 peer_id: msg.peer_id.clone(),
                                                 entity_id: msg.entity_id.clone(),
@@ -445,8 +462,9 @@ async fn spawn_tcp_stub(
                                 tokio::spawn(async move {
                                     while let Some(msg) = rx.recv().await {
                                         let len = (msg.len() as u32).to_be_bytes();
-                                        if let Err(_) = writer.write_all(&len).await { break; }
-                                        if let Err(_) = writer.write_all(&msg).await { break; }
+                                        eprintln!("stub: client writer sending {} bytes to {}", msg.len(), peer_addr);
+                                        if let Err(e) = writer.write_all(&len).await { eprintln!("stub: client writer write len failed: {:?}", e); break; }
+                                        if let Err(e) = writer.write_all(&msg).await { eprintln!("stub: client writer write msg failed: {:?}", e); break; }
                                     }
                                 });
 
@@ -459,9 +477,16 @@ async fn spawn_tcp_stub(
                 Control::Publish(data) => {
                     // Forward to all peers
                     let peers_map = peers_ctrl.lock().await;
+                    eprintln!("stub: publish forwarding to {} peers", peers_map.len());
                     for (_addr, tx) in peers_map.iter() {
-                        let _ = tx.send(data.clone());
+                        match tx.send(data.clone()) {
+                            Ok(_) => eprintln!("stub: publish send succeeded"),
+                            Err(e) => eprintln!("stub: publish send failed: {:?}", e),
+                        }
                     }
+                }
+                Control::AddPeer(_) => {
+                    // no-op for TCP stub
                 }
             }
         }
@@ -502,7 +527,7 @@ mod tests {
 
         let (ctrl2, _rx2) = new_and_run(k2.clone(), Some("/ip4/127.0.0.1/tcp/0".parse().unwrap())).await.expect("node2 start");
         ctrl2.send(Control::Dial(node1_multi.clone())).expect("dial request send");
-        sleep(Duration::from_secs(1)).await; // allow connection
+        sleep(Duration::from_secs(2)).await; // allow connection and gossipsub mesh formation
 
         let msg = HashGossipMessage {
             entity_id: "global".into(),
@@ -514,8 +539,9 @@ mod tests {
         ctrl2.send(Control::Publish(data)).expect("publish");
 
         let mut saw = false;
-        for _ in 0..40 {
+        for _ in 0..80 {
             if let Some(u) = rx1.recv().await {
+                eprintln!("test: rx1 got update: {:?}", u);
                 if let GossipUpdate::HashReceived { peer_id: _peer_id, entity_id, hash } = u {
                     if entity_id == "global" && hash == msg.state_hash {
                         saw = true;
@@ -607,8 +633,8 @@ mod tests_full {
         // find a Control::Publish channel for node2 by creating a new node that sends via control - we have _ctrl2 but not used here
         // Use the spied behaviour: publish via the control channel (if exposed) - instead, send via a Dial+Publish flow
 
-        // Wait a short while to ensure connection is established
-        sleep(Duration::from_secs(1)).await;
+        // Wait a short while to ensure connection and gossipsub mesh formation
+        sleep(Duration::from_secs(2)).await;
 
         // Use the discovery-based dial to send the message: create a fresh control and publish via it
         let ctrl_publish = _ctrl2;
@@ -616,8 +642,9 @@ mod tests_full {
         ctrl_publish.send(Control::Publish(_data)).expect("publish");
 
         let mut saw = false;
-        for _ in 0..60 {
+        for _ in 0..80 {
             if let Some(u) = rx1.recv().await {
+                eprintln!("test_full: rx1 got update: {:?}", u);
                 if let GossipUpdate::HashReceived { peer_id: _peer_id, entity_id, hash } = u {
                     if entity_id == "global" && hash == msg.state_hash {
                         saw = true;
