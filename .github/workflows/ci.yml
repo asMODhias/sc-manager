@@ -28,6 +28,14 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: Install protoc when needed
+        run: |
+          if [ "${{ matrix.features }}" = "libp2p" ]; then
+            sudo apt-get update
+            sudo apt-get install -y protobuf-compiler
+            protoc --version
+          fi
+
       - name: Run tests (features = ${{ matrix.features }})
         run: |
           if [ "${{ matrix.features }}" = "" ]; then
