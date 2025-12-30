@@ -59,7 +59,9 @@ pub async fn handle_marketplace_create(State(state): State<AppState>, Json(paylo
     let mp = mp.read().await;
     match mp.insert_item(item).await {
         Ok(()) => Ok(StatusCode::CREATED),
-        Err(e) => Err((StatusCode::CONFLICT, format!("marketplace error: {}", e))),
+        Err(crate::marketplace::MarketplaceError::Exists) => Err((StatusCode::CONFLICT, "item already exists".into())),
+        Err(crate::marketplace::MarketplaceError::Storage(e)) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("storage error: {}", e))),
+        Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR, "marketplace error".into())),
     }
 }
 
