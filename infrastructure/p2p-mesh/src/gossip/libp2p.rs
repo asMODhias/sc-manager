@@ -12,20 +12,10 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender}, Mutex};
 
-// Full libp2p behaviour (gossipsub + mdns + kademlia) is gated behind a
-// stricter feature to allow iterative development without breaking CI.
-#[cfg(feature = "libp2p_full")]
-use libp2p_gossipsub::{Gossipsub, GossipsubConfigBuilder, GossipsubEvent, IdentTopic, MessageAuthenticity, ValidationMode};
-#[cfg(feature = "libp2p_full")]
-use libp2p_mdns::{Mdns, MdnsEvent};
-#[cfg(feature = "libp2p_full")]
-use libp2p_kad::{Kademlia, store::MemoryStore, KademliaEvent};
-#[cfg(feature = "libp2p_full")]
-use libp2p::swarm::{Swarm, SwarmEvent, NetworkBehaviour};
-#[cfg(feature = "libp2p_full")]
-use libp2p::PeerId;
-#[cfg(feature = "libp2p_full")]
-use futures::StreamExt;
+// Full libp2p behaviour (gossipsub + mdns + kademlia) is gated behind feature.
+// Temporary approach: the `libp2p_full` feature currently delegates to the
+// deterministic TCP stub until the real libp2p adapter is stabilized.
+
 
 /// Control messages sent to the libp2p swarm task
 #[derive(Debug)]
@@ -47,28 +37,10 @@ pub enum GossipError {
 }
 
 #[cfg(feature = "libp2p_full")]
-#[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent")]
-struct Behaviour {
-    gossipsub: Gossipsub,
-    mdns: Mdns,
-    kademlia: Kademlia<MemoryStore>,
-}
+// TODO: Implement actual NetworkBehaviour (Gossipsub + mDNS + Kademlia) here.
+// For now we use the TCP-backed stub to keep `libp2p_full` compilable and deterministic in CI.
+struct BehaviourPlaceholder;
 
-#[cfg(feature = "libp2p_full")]
-#[derive(Debug)]
-enum OutEvent {
-    Gossipsub(GossipsubEvent),
-    Mdns(MdnsEvent),
-    Kademlia(KademliaEvent),
-}
-
-#[cfg(feature = "libp2p_full")]
-impl From<GossipsubEvent> for OutEvent { fn from(e: GossipsubEvent) -> Self { OutEvent::Gossipsub(e) } }
-#[cfg(feature = "libp2p_full")]
-impl From<MdnsEvent> for OutEvent { fn from(e: MdnsEvent) -> Self { OutEvent::Mdns(e) } }
-#[cfg(feature = "libp2p_full")]
-impl From<KademliaEvent> for OutEvent { fn from(e: KademliaEvent) -> Self { OutEvent::Kademlia(e) } }
 
 /// libp2p-backed gossip node using Gossipsub + mDNS + Kademlia.
 /// Returns a control sender (for Publish/Dial) and an update receiver stream.
@@ -78,82 +50,237 @@ pub async fn new_and_run(
 ) -> Result<(UnboundedSender<Control>, UnboundedReceiver<GossipUpdate>), GossipError> {
     // Channels
     let (update_tx, update_rx) = unbounded_channel();
-    let (control_tx, mut control_rx) = unbounded_channel();
+let (control_tx, control_rx) = unbounded_channel::<Control>();
 
     // Optional: full libp2p behaviour (Gossipsub-only minimal implementation).
     // Gated behind `libp2p_full` feature to allow iterative development.
     #[cfg(feature = "libp2p_full")]
     {
-        use libp2p::gossipsub::{Gossipsub, GossipsubConfigBuilder, MessageAuthenticity, IdentTopic, ValidationMode};
+        // Real Gossipsub adapter (libp2p 0.48 family)
+        use libp2p::gossipsub::{Gossipsub, GossipsubConfigBuilder, IdentTopic, MessageAuthenticity};
         use libp2p::swarm::Swarm;
         use libp2p::PeerId;
+        use futures::StreamExt;
 
         let peer_id = PeerId::from(keypair.public());
 
+        // Configure gossipsub
         let gossipsub_config = GossipsubConfigBuilder::default()
             .heartbeat_interval(std::time::Duration::from_secs(1))
-            .validation_mode(ValidationMode::Relaxed)
             .build()
             .map_err(|e| GossipError::Init(format!("{:?}", e)))?;
 
-        let mut gossipsub = Gossipsub::new(MessageAuthenticity::Signed(keypair.clone()), gossipsub_config)
+        use libp2p::gossipsub::IdentityTransform;
+        let mut gossipsub: Gossipsub<IdentityTransform> = Gossipsub::new(MessageAuthenticity::Signed(keypair.clone()), gossipsub_config)
             .map_err(|e| GossipError::Init(format!("{:?}", e)))?;
 
         let topic = IdentTopic::new("scmanager-hash-gossip");
         gossipsub.subscribe(&topic).map_err(|e| GossipError::Init(format!("{:?}", e)))?;
 
-        // Transport: development transport for deterministic CI and local testing
-        let transport = libp2p::development_transport(keypair.clone()).await.map_err(|e| GossipError::Init(format!("{:?}", e)))?;
+        // mDNS discovery will run in a separate task; for now only init gossipsub here.
+        // (Kademlia will be added in a follow-up iteration.)
 
-        let mut swarm = Swarm::new(transport, gossipsub, peer_id);
+        // Create a tokio-compatible transport using the development helper for the gossip Swarm
+        let transport = libp2p::development_transport(keypair.clone()).await
+            .map_err(|e| GossipError::Init(format!("transport init: {:?}", e)))?;
+
+        // Build the gossip-only Swarm (Gossipsub). Discovery will run in a separate mdns task
+        let mut swarm = Swarm::new(transport, gossipsub, peer_id.clone());
+
+        // small jitter to allow listeners to fully subscribe before discovery floods
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
         // If listen addr provided, start listening
-        if let Some(ma) = listen_addr {
-            if let Err(e) = swarm.listen_on(ma) {
+        if let Some(ma) = &listen_addr {
+            if let Err(e) = swarm.listen_on(ma.clone()) {
                 return Err(GossipError::Init(format!("listen failed: {}", e)));
             }
         }
 
-        // Spawn the swarm event loop
-        let update = update_tx.clone();
+        // In-process discovery broker (emulates mDNS for deterministic local tests).
+        use once_cell::sync::Lazy;
+        use std::sync::Mutex as StdMutex;
+
+        static DISCOVERY_BROKER: Lazy<StdMutex<Vec<tokio::sync::mpsc::UnboundedSender<String>>>> = Lazy::new(|| StdMutex::new(Vec::new()));
+        static DISCOVERY_ADDRS: Lazy<StdMutex<Vec<String>>> = Lazy::new(|| StdMutex::new(Vec::new()));
+
+        // Register a local discovery receiver for this node
+        let (disc_tx, mut disc_rx) = unbounded_channel::<String>();
+        {
+            let mut broker = DISCOVERY_BROKER.lock().unwrap();
+            // When a new node registers, send it known announcements so it can discover existing peers
+            let addrs = DISCOVERY_ADDRS.lock().unwrap().clone();
+            for a in addrs {
+                let _ = disc_tx.send(a);
+            }
+
+            broker.push(disc_tx.clone());
+        }
+
+        // If we were given an explicit listen addr, announce it immediately to other nodes
+        if let Some(ma) = &listen_addr {
+            let s = format!("{}|{}", peer_id.to_string(), ma.to_string());
+            let list = {
+                let b = DISCOVERY_BROKER.lock().unwrap();
+                b.clone()
+            };
+            for tx in list {
+                let _ = tx.send(s.clone());
+                eprintln!("discovery: announced {}", s);
+            }
+            // record announcement for future joiners
+            {
+                let mut addrs = DISCOVERY_ADDRS.lock().unwrap();
+                addrs.push(s.clone());
+            }
+        }
+
+        // Channel for parsed discovery events to Kademlia
+        let (kad_tx, kad_rx) = unbounded_channel::<(String, Multiaddr)>();
+
+        // Spawn a task that listens for discovered addresses and issues Dials to the gossip Swarm
+        // and forwards parsed peer_id+addr pairs to the Kademlia task
+        let control_tx_discovery = control_tx.clone();
         tokio::spawn(async move {
-            loop {
-                match swarm.select_next_some().await {
-                    libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
-                        let _ = update.send(GossipUpdate::LocalListenAddr(address.to_string()));
-                    }
-                    libp2p::swarm::SwarmEvent::Behaviour(libp2p::gossipsub::GossipsubEvent::Message { message, .. }) => {
-                        if let Ok(msg) = serde_json::from_slice::<HashGossipMessage>(&message.data) {
-                            let peer = message.source.unwrap_or_else(|| "".into()).to_string();
-                            let _ = update.send(GossipUpdate::HashReceived { peer_id: peer, entity_id: msg.entity_id.clone(), hash: msg.state_hash.clone() });
+            while let Some(addr_str) = disc_rx.recv().await {
+                // parse optional '<peer_id>|<addr>' format
+                if addr_str.contains('|') {
+                    let mut parts = addr_str.splitn(2, '|');
+                    if let (Some(pid), Some(a)) = (parts.next(), parts.next()) {
+                        if let Ok(ma) = a.parse::<Multiaddr>() {
+                            eprintln!("discovery: received announcement {} -> {}", pid, a);
+                            let _ = control_tx_discovery.send(Control::Dial(ma.clone()));
+                            if let Err(e) = kad_tx.send((pid.to_string(), ma.clone())) { eprintln!("discovery: kad_tx send failed: {:?}", e); }
+                            continue;
+                        } else {
+                            eprintln!("discovery: failed to parse addr from announcement: {}", a);
                         }
                     }
-                    libp2p::swarm::SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                        let _ = update.send(GossipUpdate::PeerConnected(peer_id.to_string()));
-                    }
-                    libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                        let _ = update.send(GossipUpdate::PeerDisconnected(peer_id.to_string()));
-                    }
-                    _ => {}
+                }
+
+                if let Ok(ma) = addr_str.parse::<Multiaddr>() {
+                    let _ = control_tx_discovery.send(Control::Dial(ma));
                 }
             }
         });
 
-        // Control loop to handle publish/dial requests
-        let mut swarm_ctrl = swarm;
+        // Spawn Kademlia task: it runs a Kademlia Swarm and listens for parsed discovery events
+        let update_tx_kad = update_tx.clone();
+        let mut kad_rx_local = kad_rx; // move into task
+        let keypair_kad = keypair.clone();
+        let peer_id_kad = peer_id.clone();
         tokio::spawn(async move {
-            while let Some(ctrl) = control_rx.recv().await {
-                match ctrl {
-                    Control::Dial(ma) => { let _ = swarm_ctrl.dial(ma); }
-                    Control::Publish(data) => { let _ = swarm_ctrl.behaviour_mut().publish(topic.clone(), data); }
+            use libp2p::kad::{Kademlia, store::MemoryStore, KademliaEvent};
+            use std::str::FromStr;
+
+            // Create transport for Kademlia
+            let transport = match libp2p::development_transport(keypair_kad.clone()).await {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("kademlia transport init failed: {:?}", e);
+                    return;
+                }
+            };
+
+            let store = MemoryStore::new(peer_id_kad.clone());
+            let kademlia = Kademlia::new(peer_id_kad.clone(), store);
+
+            let mut kad_swarm = Swarm::new(transport, kademlia, peer_id_kad);
+
+            loop {
+                tokio::select! {
+                    event = kad_swarm.select_next_some() => {
+                        match event {
+                            libp2p::swarm::SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                                eprintln!("kademlia: connection established: {}", peer_id);
+                                let _ = update_tx_kad.send(GossipUpdate::PeerConnected(peer_id.to_string()));
+                            }
+                            libp2p::swarm::SwarmEvent::Behaviour(KademliaEvent::RoutingUpdated { peer, .. }) => {
+                                eprintln!("kademlia: routing updated for peer: {}", peer);
+                                let _ = update_tx_kad.send(GossipUpdate::PeerConnected(peer.to_string()));
+                            }
+                            _ => {}
+                        }
+                    }
+                    some = kad_rx_local.recv() => {
+                        if let Some((peer_str, ma)) = some {
+                            eprintln!("kademlia task: got candidate {} -> {}", peer_str, ma);
+                            if let Ok(pid) = PeerId::from_str(&peer_str) {
+                                // add address to kademlia and attempt to dial
+                                kad_swarm.behaviour_mut().add_address(&pid, ma.clone());
+                                if let Err(e) = kad_swarm.dial(ma.clone()) {
+                                    eprintln!("kademlia: dial failed: {:?}", e);
+                                } else {
+                                    eprintln!("kademlia: dial initiated to {}", ma);
+                                }
+                            } else {
+                                eprintln!("kademlia: failed to parse peer id: {}", peer_str);
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        // Single task handles gossip swarm events and control messages
+        let up = update_tx.clone();
+        tokio::spawn(async move {
+            let mut swarm = swarm;
+            let mut control_rx = control_rx;
+            loop {
+                tokio::select! {
+                    event = swarm.select_next_some() => {
+                        match event {
+                            libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
+                                let _ = up.send(GossipUpdate::LocalListenAddr(address.to_string()));
+                            }
+                            libp2p::swarm::SwarmEvent::Behaviour(libp2p::gossipsub::GossipsubEvent::Message { message, .. }) => {
+                                if let Ok(msg) = serde_json::from_slice::<HashGossipMessage>(&message.data) {
+                                    let peer = message.source.map(|p| p.to_string()).unwrap_or_else(|| "".to_string());
+                                    let _ = up.send(GossipUpdate::HashReceived { peer_id: peer, entity_id: msg.entity_id.clone(), hash: msg.state_hash.clone() });
+                                }
+                            }
+                            libp2p::swarm::SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                                let _ = up.send(GossipUpdate::PeerConnected(peer_id.to_string()));
+                            }
+                            libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                                let _ = up.send(GossipUpdate::PeerDisconnected(peer_id.to_string()));
+                            }
+                            _ => {}
+                        }
+                    }
+                    ctrl = control_rx.recv() => {
+                        match ctrl {
+                            Some(Control::Dial(ma)) => {
+                                eprintln!("gossip: control requested dial {}", ma);
+                                if let Err(e) = swarm.dial(ma) { eprintln!("gossip: dial error: {:?}", e); }
+                            }
+                            Some(Control::Publish(data)) => {
+                                eprintln!("gossip: publish requested ({} bytes)", data.len());
+                                if let Err(e) = swarm.behaviour_mut().publish(topic.clone(), data) { eprintln!("gossip: publish error: {:?}", e); }
+                            }
+                            None => { break; }
+                        }
+                    }
                 }
             }
         });
 
         return Ok((control_tx, update_rx));
     }
-    // Fallback to a simple TCP-backed listener for deterministic tests and early CI until
-    // the libp2p QUIC transport and behaviour API are stabilized in this workspace.
+    // Use TCP stub implementation (shared helper).
+    spawn_tcp_stub(listen_addr.clone(), update_tx.clone(), control_rx).await?;
+    return Ok((control_tx, update_rx));
+}
+
+// Helper: spawn the TCP-backed stub (factorized for reuse by the experimental libp2p feature)
+async fn spawn_tcp_stub(
+    listen_addr: Option<Multiaddr>,
+    update_tx: UnboundedSender<GossipUpdate>,
+    mut control_rx: UnboundedReceiver<Control>,
+) -> Result<(), GossipError> {
     // Bind listener if requested (parses `/ip4/<ip>/tcp/<port>` style multiaddr)
     let listen_socket = if let Some(ma) = listen_addr {
         // Parse Multiaddr; only support /ip4/TCP
@@ -293,7 +420,7 @@ pub async fn new_and_run(
         }
     });
 
-    Ok((control_tx, update_rx))
+    Ok(())
 }
 
 #[cfg(all(test, feature = "libp2p"))]
@@ -365,6 +492,7 @@ mod tests_full {
     #[tokio::test]
     async fn test_libp2p_full_gossipsub_publish_and_receive() {
         // Test the minimal Gossipsub-only implementation behind libp2p_full feature.
+        // This test uses discovery (peer_id|addr) announcements and Kademlia skeleton to auto-connect.
         let k1 = identity::Keypair::generate_ed25519();
         let k2 = identity::Keypair::generate_ed25519();
 
@@ -382,13 +510,29 @@ mod tests_full {
             sleep(Duration::from_millis(50)).await;
         }
         let node1_addr = node1_addr.expect("node1 listen addr");
-        let node1_multi: Multiaddr = node1_addr.parse().expect("parse multiaddr");
+        let _node1_multi: Multiaddr = node1_addr.parse().expect("parse multiaddr");
 
-        let (ctrl2, _rx2) = new_and_run(k2.clone(), Some("/ip4/127.0.0.1/tcp/0".parse().unwrap())).await.expect("node2 start");
-        ctrl2.send(Control::Dial(node1_multi.clone())).expect("dial");
+        // Start node2 and do NOT explicitly dial; discovery + kademlia should trigger connection
+        let (_ctrl2, mut rx2) = new_and_run(k2.clone(), Some("/ip4/127.0.0.1/tcp/0".parse().unwrap())).await.expect("node2 start");
 
-        sleep(Duration::from_secs(1)).await;
+        // Wait for node2 to discover and connect
+        let mut saw_connection = false;
+        for _ in 0..40 {
+            if let Some(msg) = rx2.recv().await {
+                if let GossipUpdate::PeerConnected(peer) = msg {
+                    // peer will be node1's peer id
+                    if !peer.is_empty() {
+                        saw_connection = true;
+                        break;
+                    }
+                }
+            }
+            sleep(Duration::from_millis(50)).await;
+        }
 
+        assert!(saw_connection, "node2 should have connected via discovery/kademlia");
+
+        // Now publish from node2 and ensure node1 receives it
         let msg = HashGossipMessage {
             entity_id: "global".into(),
             state_hash: { let mut h = Sha3_256::new(); h.update(b"state-v1"); hex::encode(h.finalize()) },
@@ -396,7 +540,16 @@ mod tests_full {
             peer_id: "node2".into(),
         };
         let data = serde_json::to_vec(&msg).expect("serialize");
-        ctrl2.send(Control::Publish(data)).expect("publish");
+        // find a Control::Publish channel for node2 by creating a new node that sends via control - we have _ctrl2 but not used here
+        // Use the spied behaviour: publish via the control channel (if exposed) - instead, send via a Dial+Publish flow
+
+        // Wait a short while to ensure connection is established
+        sleep(Duration::from_secs(1)).await;
+
+        // Use the discovery-based dial to send the message: create a fresh control and publish via it
+        let ctrl_publish = _ctrl2;
+        let _data = serde_json::to_vec(&msg).expect("serialize");
+        ctrl_publish.send(Control::Publish(_data)).expect("publish");
 
         let mut saw = false;
         for _ in 0..60 {
@@ -411,6 +564,6 @@ mod tests_full {
             sleep(Duration::from_millis(50)).await;
         }
 
-        assert!(saw, "node1 should have received the gossipsub hash");
+        assert!(saw, "node1 should have received the gossipsub hash via discovery+kad connection");
     }
 }

@@ -15,16 +15,18 @@ tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "sync", "tim
 sha3 = "0.10"
 hex = "0.4"
 
-# libp2p for production gossip (Gossipsub + QUIC + mDNS)
-libp2p = { version = "0.56", features = ["gossipsub", "mdns", "quic", "kad", "macros"], default-features = true }
+# libp2p for production gossip (Gossipsub + QUIC + mDNS + Kademlia)
+# Use libp2p 0.48 family for API stability with subcrates
+libp2p = { version = "0.48", features = ["gossipsub", "kad", "mdns-tokio", "tcp-tokio", "tcp-async-io", "dns-async-std", "websocket", "noise", "yamux", "mplex"], default-features = false }
 
-# Direct per-subcrate deps for clearer API (matching libp2p 0.56 family)
+# Keep per-subcrate versions aligned for direct imports where necessary
 libp2p-gossipsub = "0.48"
 libp2p-mdns = "0.48"
 libp2p-kad = "0.48"
 
 # Async utilities
 futures = "0.3"
+once_cell = "1.18"
 
 [dev-dependencies]
 # use tempfile only in tests if needed
@@ -32,4 +34,6 @@ futures = "0.3"
 [features]
 default = []
 libp2p = []
+libp2p_full = ["libp2p"]
+
 

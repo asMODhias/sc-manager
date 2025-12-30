@@ -72,7 +72,7 @@ impl CRDTStateManager {
     }
 
     /// Generate a sync message for a peer - here: JSON of the single org state
-    pub async fn generate_sync_message(&self, peer_id: &str) -> Result<Vec<u8>, CRDTError> {
+    pub async fn generate_sync_message(&self, _peer_id: &str) -> Result<Vec<u8>, CRDTError> {
         // For now send full state for simplicity
         let guard = self.inner.read().await;
         let b = serde_json::to_vec(&*guard)?;
