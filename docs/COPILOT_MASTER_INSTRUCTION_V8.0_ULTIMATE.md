@@ -398,6 +398,16 @@ Failure_Scenarios:
 
 ---
 
+## Post-merge: CIG Fankit import (2025-12-30)
+
+- **Merged** via **admin override** on 2025-12-30 due to exhausted GitHub Actions quota (PR #27). ⚠️
+- **Local Quick-Tests and Smoke-Run** completed successfully prior to merge.
+- **Tag & Release:** `v8.0.0-fankit` created and GitHub release published.
+- **License/TOS:** `assets/fankit/LICENSE_CIG_FANKIT.txt` included and confirmed by the repository owner.
+- **Governance note:** Admin overrides must be documented and are exceptional; re-enable external CI quota as soon as possible and follow up with a re-run of remote checks where feasible.
+
+---
+
 ## 🏢 PART 2: ENTERPRISE PROGRAM LOGIC
 
 ### 2.1 Multi-Tenant Architecture
