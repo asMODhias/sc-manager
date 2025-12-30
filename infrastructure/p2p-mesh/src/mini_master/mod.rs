@@ -242,21 +242,18 @@ mod tests {
         // start periodic broadcasting with short interval
         mm.start_hash_broadcast_with_interval(Duration::from_millis(20)).await;
 
-        // Wait for a couple of broadcasts
-        sleep(Duration::from_millis(60)).await;
-
-        // We should have received at least one HashReceived
-        let mut found = false;
-        while let Ok(u) = rx.try_recv() {
-            if let crate::gossip::GossipUpdate::HashReceived { peer_id, entity_id, .. } = u {
+        // Wait for a broadcast with timeout to avoid flaky try_recv loops
+        use tokio::time::timeout;
+        let res = timeout(Duration::from_millis(200), rx.recv()).await;
+        match res {
+            Ok(Some(crate::gossip::GossipUpdate::HashReceived { peer_id, entity_id, .. })) => {
                 assert_eq!(peer_id, "peer-mm");
                 assert_eq!(entity_id, "global");
-                found = true;
-                break;
             }
+            Ok(Some(_)) => panic!("received unexpected gossip update"),
+            Ok(None) => panic!("gossip channel closed"),
+            Err(_) => panic!("timeout waiting for HashReceived"),
         }
-
-        assert!(found, "expected at least one HashReceived event");
     }
 
     // E2E test using TCP-backed libp2p stub control channels
@@ -311,10 +308,12 @@ mod tests {
         // start broadcasting on node2 with short interval
         mm2.start_hash_broadcast_with_interval(Duration::from_millis(20)).await;
 
-        // node1's rx1 should receive HashReceived from node2
+        // node1's rx1 should receive HashReceived from node2 within a timeout
+        use tokio::time::{Instant, timeout};
+        let deadline = Instant::now() + Duration::from_secs(2);
         let mut saw = false;
-        for _ in 0..40 {
-            if let Some(u) = rx1.recv().await {
+        while Instant::now() < deadline {
+            if let Ok(Some(u)) = timeout(Duration::from_millis(250), rx1.recv()).await {
                 if let crate::gossip::GossipUpdate::HashReceived { peer_id: _p, entity_id, hash } = u {
                     if entity_id == "global" {
                         // compute node1 local hash and ensure mismatch (since states differ)
@@ -326,8 +325,7 @@ mod tests {
                     }
                 }
             }
-            sleep(Duration::from_millis(25)).await;
         }
-        assert!(saw, "expected node1 to receive a HashReceived from node2");
+        assert!(saw, "expected node1 to receive a HashReceived from node2 within timeout");
     }
 }
