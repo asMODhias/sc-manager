@@ -22,6 +22,7 @@ PR #27 (Import CIG Fankit: assets, tooling, manifest & docs) wurde am 2025-12-30
 - [ ] Remote GitHub Actions für PR #27 erneut ausführen, sobald Quota/Runner verfügbar sind; alle fehlschlagenden Checks protokollieren und ggf. Fixes in einem Folge-PR adressieren.
 - [ ] Legal: Falls noch nicht final bestätigt, eine schriftliche Bestätigung einholen, dass die Fankit-Assets zur Aufnahme in dieses Repo freigegeben sind.
 - [ ] Team-Ankündigung: Release & Import in internem Kommunikationskanal (Slack/Teams) posten.
+- [x] **Local-only auto-merge process implemented:** `scripts/auto-merge-local-ci.(ps1|sh)` and `docs/LOCAL_AUTO_MERGE.md` added — runs full local CI and performs admin-override merge if successful. This is an exceptional workflow and must be used with caution.
 
 **Governance**
 
