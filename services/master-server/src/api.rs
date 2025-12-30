@@ -31,6 +31,7 @@ pub fn router(master: Arc<MasterServer>) -> Router {
         .route("/api/v1/updates", post(handle_publish_update))
         .route("/api/v1/audit/events", get(handle_list_audit_events))
         .route("/api/v1/marketplace/items", get(handle_marketplace_list).post(handle_marketplace_create))
+        .route("/api/v1/admin/marketplace/compact", post(handle_admin_compact))
         .route("/health", get(handle_health))
         .with_state(s)
 }
@@ -78,6 +79,31 @@ pub async fn handle_list_audit_events(State(state): State<AppState>) -> Result<J
     }
 }
 
+/// Admin endpoint: trigger marketplace compaction (requires admin token header `x-admin-token`)
+pub async fn handle_admin_compact(State(state): State<AppState>, headers: axum::http::HeaderMap) -> Result<StatusCode, (StatusCode, String)> {
+    // Validate admin token if configured
+    let master = &state.master;
+    match &master.admin_token {
+        Some(expected) => {
+            let provided = headers.get("x-admin-token").and_then(|v| v.to_str().ok()).unwrap_or("");
+            if provided != expected {
+                return Err((StatusCode::UNAUTHORIZED, "invalid admin token".into()));
+            }
+        }
+        None => {
+            return Err((StatusCode::FORBIDDEN, "admin endpoints disabled".into()));
+        }
+    }
+
+    // Trigger compaction
+    let mp = master.marketplace.clone();
+    let mp = mp.read().await;
+    match mp.compact().await {
+        Ok(()) => Ok(StatusCode::OK),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("compaction failed: {}", e))),
+    }
+}
+
 
 /// Handler to accept signed UpdateEntry
 pub async fn handle_publish_update(
@@ -120,6 +146,7 @@ mod tests {
     use crate::MasterServer;
     use tempfile::NamedTempFile;
     use base64::Engine;
+    use axum::http::HeaderMap;
 
     #[tokio::test]
     async fn test_handle_publish_update_ok() {
@@ -159,6 +186,32 @@ mod tests {
         assert!(res.is_ok());
         let Json(list) = res.unwrap();
         assert_eq!(list.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_admin_compact_requires_token() {
+        let tf = NamedTempFile::new().expect("tmp");
+        let ledger_path = tf.path().to_path_buf();
+        let mut ms = MasterServer::new_with_ledger("ms-admin", ledger_path.clone());
+        // set a token
+        ms.admin_token = Some("sekret".into());
+        let arc = std::sync::Arc::new(ms);
+
+        // No header -> should be unauthorized
+        let res = handle_admin_compact(State(AppState { master: arc.clone() }), HeaderMap::new()).await;
+        assert!(matches!(res, Err((StatusCode::UNAUTHORIZED, _))));
+
+        // Wrong token
+        let mut hm = HeaderMap::new();
+        hm.insert("x-admin-token", "wrong".parse().unwrap());
+        let res = handle_admin_compact(State(AppState { master: arc.clone() }), hm).await;
+        assert!(matches!(res, Err((StatusCode::UNAUTHORIZED, _))));
+
+        // Correct token -> OK
+        let mut hm2 = HeaderMap::new();
+        hm2.insert("x-admin-token", "sekret".parse().unwrap());
+        let res = handle_admin_compact(State(AppState { master: arc.clone() }), hm2).await;
+        assert!(res.is_ok());
     }
 
     #[tokio::test]

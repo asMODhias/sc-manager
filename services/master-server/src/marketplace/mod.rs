@@ -43,6 +43,16 @@ impl Marketplace {
     /// Persistent marketplace backed by NDJSON event file
     pub fn with_ledger(path: impl Into<PathBuf>) -> Result<Self, crate::marketplace::storage::MarketplaceStorageError> {
         let ledger = MarketplaceLedger::new(path);
+
+        // If a snapshot exists, load state directly from snapshot for fast startup
+        let snap = ledger.snapshot_path();
+        if snap.exists() {
+            let s = std::fs::read_to_string(&snap)?;
+            let state: HashMap<String, Item> = serde_json::from_str(&s)?;
+            return Ok(Marketplace { inner: RwLock::new(state), ledger: Some(ledger) });
+        }
+
+        // Otherwise, replay events from the ledger
         let events = ledger.load_all()?;
         let mut map = HashMap::new();
         for ev in events {
