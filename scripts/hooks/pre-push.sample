@@ -1,0 +1,28 @@
+# Sample pre-push hook (bash)
+# Copy or symlink this to .git/hooks/pre-push and make executable to enable.
+
+#!/bin/sh
+set -e
+
+echo "Running quick pre-push checks: format, clippy, quick tests"
+
+# Format check
+cargo fmt --all -- --check
+
+# Clippy (this may be slow; change to a subset if needed)
+cargo clippy --workspace --all-targets -- -D warnings
+
+# Run fast unit tests for the crate under active development (adjust crate name as needed)
+cargo test -p sc_manager_master_server --lib
+
+echo "Pre-push checks passed."
+
+# Sample PowerShell variant (save as pre-push.ps1.sample):
+#
+# powershell -NoProfile -ExecutionPolicy Bypass -File ./.git/hooks/pre-push.ps1
+#
+# Write-Host "Running quick pre-push checks: format, clippy, quick tests"
+# cargo fmt --all -- --check
+# cargo clippy --workspace --all-targets -- -D warnings
+# cargo test -p sc_manager_master_server --lib
+# Write-Host "Pre-push checks passed."
