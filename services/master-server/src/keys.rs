@@ -1,7 +1,7 @@
-use aes_gcm::aead::{Aead, KeyInit, OsRng as AesOsRng};
+use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
-use ed25519_dalek::{Keypair, Signature, Signer, Verifier};
+use ed25519_dalek::{Keypair, Signature, Signer};
 use ring::pbkdf2;
 use std::num::NonZeroU32;
 use rand::rngs::OsRng;
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn test_save_and_load_encrypted() {
         let ks = KeyStore::generate_testpair();
-        let mut tf = NamedTempFile::new().expect("tmp");
+        let tf = NamedTempFile::new().expect("tmp");
         let path = tf.path().to_path_buf();
         ks.save_encrypted(&path, "s3cr3t").expect("save");
         let ks2 = KeyStore::load_encrypted(&path, "s3cr3t").expect("load");

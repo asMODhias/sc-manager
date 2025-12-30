@@ -50,4 +50,36 @@ impl MarketplaceLedger {
         }
         Ok(res)
     }
+
+    /// Path to the snapshot file for this ledger
+    pub fn snapshot_path(&self) -> PathBuf {
+        let mut p = self.path.clone();
+        p.set_extension("snapshot.json");
+        p
+    }
+
+    /// Write an atomic snapshot of the provided state (map of id -> Item).
+    pub fn write_snapshot_atomic(&self, state: &std::collections::HashMap<String, crate::marketplace::Item>) -> Result<(), MarketplaceStorageError> {
+        let snap = self.snapshot_path();
+        let tmp = snap.with_extension("snapshot.json.tmp");
+        let mut w = BufWriter::new(OpenOptions::new().create(true).write(true).truncate(true).open(&tmp)?);
+        let s = serde_json::to_string(state)?;
+        w.write_all(s.as_bytes())?;
+        w.flush()?;
+        std::fs::rename(&tmp, &snap)?;
+        Ok(())
+    }
+
+    /// Compact the ledger by rotating the existing ledger file and leaving a fresh one.
+    pub fn compact(&self) -> Result<(), MarketplaceStorageError> {
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let bak = self.path.with_extension(format!("ledger.bak.{}", ts));
+        // If ledger exists, rename to a backup
+        if self.path.exists() {
+            std::fs::rename(&self.path, &bak)?;
+        }
+        // create a new empty ledger file
+        let _ = OpenOptions::new().create(true).write(true).truncate(true).open(&self.path)?;
+        Ok(())
+    }
 }

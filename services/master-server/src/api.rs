@@ -7,7 +7,6 @@ use axum::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use serde::Deserialize;
-use base64::Engine;
 
 use crate::domain::UpdateEntry;
 use crate::publish;
@@ -79,13 +78,48 @@ pub async fn handle_list_audit_events(State(state): State<AppState>) -> Result<J
     }
 }
 
+
+/// Handler to accept signed UpdateEntry
+pub async fn handle_publish_update(
+    State(state): State<AppState>,
+    Json(payload): Json<UpdateEntry>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Use the master's keystore and a ledger instance (master provides)
+    let master = &state.master;
+
+    publish::publish_update(&master.ks, &master.ledger, &payload)
+        .map_err(|e| match e {
+            crate::publish::PublishError::InvalidSignature => (StatusCode::UNAUTHORIZED, "invalid signature".into()),
+            crate::publish::PublishError::Io(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("io error: {}", err)),
+            crate::publish::PublishError::Serde(err) => (StatusCode::BAD_REQUEST, format!("serialize error: {}", err)),
+        })?;
+
+    Ok(StatusCode::OK)
+}
+
+/// Run server (blocking future)
+pub async fn run_server(master: Arc<MasterServer>, addr: SocketAddr) -> Result<(), MasterError> {
+    let app = router(master);
+    let server = axum::Server::try_bind(&addr)
+        .map_err(|e| MasterError::Io(std::io::Error::other(format!("bind error: {}", e))))?
+        .serve(app.into_make_service());
+
+    // run the server until cancelled
+    tokio::spawn(async move {
+        if let Err(e) = server.await {
+            eprintln!("server run error: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::MasterServer;
     use tempfile::NamedTempFile;
-    use axum::body::Body;
-    use axum::http::{Request};
+    use base64::Engine;
 
     #[tokio::test]
     async fn test_handle_publish_update_ok() {
@@ -132,39 +166,4 @@ mod tests {
         let status = handle_health().await;
         assert_eq!(status, StatusCode::OK);
     }
-}
-
-/// Handler to accept signed UpdateEntry
-pub async fn handle_publish_update(
-    State(state): State<AppState>,
-    Json(payload): Json<UpdateEntry>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    // Use the master's keystore and a ledger instance (master provides)
-    let master = &state.master;
-
-    publish::publish_update(&master.ks, &*master.ledger, &payload)
-        .map_err(|e| match e {
-            crate::publish::PublishError::InvalidSignature => (StatusCode::UNAUTHORIZED, "invalid signature".into()),
-            crate::publish::PublishError::Io(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("io error: {}", err)),
-            crate::publish::PublishError::Serde(err) => (StatusCode::BAD_REQUEST, format!("serialize error: {}", err)),
-        })?;
-
-    Ok(StatusCode::OK)
-}
-
-/// Run server (blocking future)
-pub async fn run_server(master: Arc<MasterServer>, addr: SocketAddr) -> Result<(), MasterError> {
-    let app = router(master);
-    let server = axum::Server::try_bind(&addr)
-        .map_err(|e| MasterError::Io(std::io::Error::new(std::io::ErrorKind::Other, format!("bind error: {}", e))))?
-        .serve(app.into_make_service());
-
-    // run the server until cancelled
-    tokio::spawn(async move {
-        if let Err(e) = server.await {
-            eprintln!("server run error: {}", e);
-        }
-    });
-
-    Ok(())
 }

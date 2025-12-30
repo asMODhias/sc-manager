@@ -1,4 +1,4 @@
-use crate::domain::{AuditEvent, AuditEventType};
+use crate::domain::AuditEvent;
 use crate::storage::AppendOnlyLedger;
 use crate::storage::ledger::LedgerError;
 use thiserror::Error;
@@ -53,6 +53,7 @@ pub fn verify_chain(ledger: &AppendOnlyLedger) -> Result<bool, AuditError> {
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
+    use crate::domain::AuditEventType;
 
     #[test]
     fn test_append_and_verify_chain() {

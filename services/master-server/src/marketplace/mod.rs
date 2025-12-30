@@ -39,10 +39,6 @@ impl Marketplace {
         Marketplace { inner: RwLock::new(HashMap::new()), ledger: None }
     }
 
-    /// Provide a default implementation for clippy and ergonomic construction
-    pub fn default() -> Self {
-        Self::new()
-    }
 
     /// Persistent marketplace backed by NDJSON event file
     pub fn with_ledger(path: impl Into<PathBuf>) -> Result<Self, crate::marketplace::storage::MarketplaceStorageError> {
@@ -67,8 +63,8 @@ impl Marketplace {
         if let Some(ref ledger) = self.ledger {
             // capture current state
             let state = self.inner.read().await.clone();
-            ledger.write_snapshot_atomic(&state).map_err(|e| MarketplaceError::Storage(e))?;
-            ledger.compact().map_err(|e| MarketplaceError::Storage(e))?;
+            ledger.write_snapshot_atomic(&state).map_err(MarketplaceError::Storage)?;
+            ledger.compact().map_err(MarketplaceError::Storage)?;
         }
         Ok(())
     }
@@ -146,7 +142,7 @@ mod tests {
         let p = tf.path().to_path_buf();
 
         // create marketplace with ledger and persist an item
-        let mut mp = Marketplace::with_ledger(&p).expect("create with ledger");
+        let mp = Marketplace::with_ledger(&p).expect("create with ledger");
         let s = Arc::new(mp);
         let it = Item { id: "item-persist".into(), owner: "carol".into(), price: 250, metadata: "{}".into() };
         s.insert_item(it.clone()).await.expect("insert ok");
