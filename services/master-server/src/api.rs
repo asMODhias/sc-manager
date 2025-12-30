@@ -1,6 +1,6 @@
 use axum::{
     extract::State,
-    routing::post,
+    routing::{post, get},
     Json, Router,
     http::StatusCode,
 };
@@ -12,7 +12,6 @@ use base64::Engine;
 use crate::domain::UpdateEntry;
 use crate::publish;
 use crate::{MasterServer, MasterError};
-use crate::storage::AppendOnlyLedger;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -25,12 +24,29 @@ pub struct UpdatePayload {
     pub update: UpdateEntry,
 }
 
+
 /// Build router for master server API
 pub fn router(master: Arc<MasterServer>) -> Router {
     let s = AppState { master };
     Router::new()
         .route("/api/v1/updates", post(handle_publish_update))
+        .route("/api/v1/audit/events", get(handle_list_audit_events))
+        .route("/health", get(handle_health))
         .with_state(s)
+}
+
+/// Health check endpoint
+pub async fn handle_health() -> StatusCode {
+    StatusCode::OK
+}
+
+/// List audit events from the ledger
+pub async fn handle_list_audit_events(State(state): State<AppState>) -> Result<Json<Vec<crate::domain::AuditEvent>>, (StatusCode, String)> {
+    let ledger = &state.master.ledger;
+    match ledger.load_all() {
+        Ok(events) => Ok(Json(events)),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("ledger error: {}", e))),
+    }
 }
 
 #[cfg(test)]
@@ -38,7 +54,6 @@ mod tests {
     use super::*;
     use crate::MasterServer;
     use tempfile::NamedTempFile;
-    use serde_json::json;
     use axum::body::Body;
     use axum::http::{Request};
 
@@ -46,7 +61,7 @@ mod tests {
     async fn test_handle_publish_update_ok() {
         let tf = NamedTempFile::new().expect("tmp");
         let ledger_path = tf.path().to_path_buf();
-        let ms = MasterServer::new_with_ledger("ms-test", ledger_path);
+        let ms = MasterServer::new_with_ledger("ms-test", ledger_path.clone());
         let arc = std::sync::Arc::new(ms);
 
         // Build a signed update
@@ -65,16 +80,27 @@ mod tests {
         let s = base64::engine::general_purpose::STANDARD.encode(sig.to_bytes());
         u.signature = s;
 
-        let req = Request::builder()
-            .method("POST")
-            .uri("/api/v1/updates")
-            .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_vec(&u).unwrap()))
-            .unwrap();
-
         // Call handler directly
-        let result = handle_publish_update(State(AppState { master: arc }), Json(u)).await;
+        let result = handle_publish_update(State(AppState { master: arc.clone() }), Json(u)).await;
         assert!(result.is_ok());
+
+        // Ensure an audit event was appended
+        let ledger = &arc.ledger;
+        let events = ledger.load_all().expect("load events");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, crate::domain::AuditEventType::UpdateSigned);
+
+        // Test list audit events handler
+        let res = handle_list_audit_events(State(AppState { master: arc.clone() })).await;
+        assert!(res.is_ok());
+        let Json(list) = res.unwrap();
+        assert_eq!(list.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_health_ok() {
+        let status = handle_health().await;
+        assert_eq!(status, StatusCode::OK);
     }
 }
 
