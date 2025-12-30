@@ -18,7 +18,21 @@ if ($env:PROTOC) {
 }
 if (-not $protocFound) {
     Write-Host "[warn] protoc not found. Crates that require `protoc` (prost) will be skipped. Install protoc or set PROTOC env var to enable them." -ForegroundColor Yellow
-    $skipProtoc = $true
+    if ($env:PROTOC_AUTO_INSTALL -eq '1') {
+        Write-Host "[info] PROTOC_AUTO_INSTALL=1: attempting automated install via scripts/install-protoc.ps1"
+        try {
+            & "$PSScriptRoot\install-protoc.ps1"
+            # re-check
+            $protocFound = Found-Protoc
+            if ($protocFound) { Write-Host "[info] protoc installed successfully" ; $skipProtoc = $false }
+            else { Write-Host "[warn] automated install failed; skipping protoc-dependent crates" -ForegroundColor Yellow ; $skipProtoc = $true }
+        } catch {
+            Write-Host "[warn] automated install errored: $_" -ForegroundColor Yellow
+            $skipProtoc = $true
+        }
+    } else {
+        $skipProtoc = $true
+    }
 } else {
     $skipProtoc = $false
 }

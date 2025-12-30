@@ -19,7 +19,18 @@ elif command -v protoc >/dev/null 2>&1; then
 fi
 if [ "$PROTOC_FOUND" -eq 0 ]; then
   echo "[warn] protoc not found. Crates requiring protoc (prost) will be skipped. Install protoc or set PROTOC env var to enable them."
-  SKIP_PROTOC=1
+  if [ "${PROTOC_AUTO_INSTALL:-0}" = "1" ]; then
+    echo "[info] PROTOC_AUTO_INSTALL=1: attempting automated install via scripts/install-protoc.sh"
+    if ./scripts/install-protoc.sh; then
+      echo "[info] protoc installed successfully; continuing"
+      SKIP_PROTOC=0
+    else
+      echo "[warn] automated install failed; skipping protoc-dependent crates"
+      SKIP_PROTOC=1
+    fi
+  else
+    SKIP_PROTOC=1
+  fi
 else
   SKIP_PROTOC=0
 fi
