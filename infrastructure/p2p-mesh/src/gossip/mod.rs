@@ -177,7 +177,7 @@ mod tests {
         for _ in 0..2 {
             if let Some(u) = rx1.recv().await {
                 match u {
-                    GossipUpdate::HashReceived { peer_id, entity_id, hash } => {
+                    GossipUpdate::HashReceived { peer_id, entity_id, hash: _hash } => {
                         assert_eq!(peer_id, "peer-b");
                         assert_eq!(entity_id, "global");
                         saw_hash = true;

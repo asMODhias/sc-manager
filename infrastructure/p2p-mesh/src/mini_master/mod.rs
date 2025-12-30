@@ -1,5 +1,7 @@
 use crate::crdt::CRDTStateManager;
-use crate::gossip::{HashGossipNode, GossipUpdate};
+use crate::gossip::HashGossipNode;
+#[cfg(feature = "libp2p")]
+use crate::gossip::GossipUpdate;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
@@ -7,12 +9,12 @@ use tokio::time::{interval, Duration};
 /// Master client stub for reporting to author master
 #[derive(Clone)]
 pub struct MasterClient {
-    base_url: String,
+    _base_url: String,
 }
 
 impl MasterClient {
     pub fn new(base_url: String) -> Self {
-        Self { base_url }
+        Self { _base_url: base_url }
     }
 
     pub async fn report_health(&self, _node_id: &str) -> Result<(), MasterClientError> {
@@ -31,7 +33,7 @@ pub enum MasterClientError {
 ///
 /// Coordinates CRDT and HashGossip to report and monitor state.
 pub struct MiniMaster {
-    node_id: String,
+    _node_id: String,
     pub crdt: Arc<CRDTStateManager>,
     /// In-memory gossip node (optional)
     pub gossip: Option<Arc<RwLock<HashGossipNode>>>,
@@ -62,7 +64,7 @@ impl MiniMaster {
         is_author: bool,
     ) -> Self {
         Self {
-            node_id,
+            _node_id: node_id,
             crdt: Arc::new(crdt),
             gossip: Some(Arc::new(RwLock::new(gossip))),
             #[cfg(feature = "libp2p")]
