@@ -11,16 +11,46 @@ echo "==> Local CI Status run: $(date -u +"%Y-%m-%d %H:%M:%SZ")"
 
 SUMMARY=()
 
+MAX_STEP_SECONDS=${MAX_STEP_SECONDS:-300}
+
 step() {
   local name="$1"
   shift
   local start=$(date +%s)
-  echo "--- Running: $name"
-  if "$@" 2>&1 | tee -a "$TMPLOG"; then
-    local rc=0
+  echo "--- Running: $name (timeout: ${MAX_STEP_SECONDS}s)"
+
+  if command -v timeout >/dev/null 2>&1; then
+    # Use timeout utility when available
+    if timeout "${MAX_STEP_SECONDS}s" "$@" 2>&1 | tee -a "$TMPLOG"; then
+      local rc=0
+    else
+      local rc=$?
+      if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+        echo "!!! $name: timed out after ${MAX_STEP_SECONDS}s" | tee -a "$TMPLOG"
+      fi
+    fi
   else
-    local rc=1
+    # Fallback: run command in background and kill after timeout
+    ("$@" 2>&1 | tee -a "$TMPLOG") &
+    local pid=$!
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+      sleep 1
+      waited=$((waited+1))
+      if [ "$waited" -ge "$MAX_STEP_SECONDS" ]; then
+        echo "!!! $name: timed out after ${MAX_STEP_SECONDS}s (killing $pid)" | tee -a "$TMPLOG"
+        kill -9 "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        local rc=124
+        break
+      fi
+    done
+    if [ -z "${rc+set}" ]; then
+      wait "$pid"
+      local rc=$?
+    fi
   fi
+
   local end=$(date +%s)
   local dur=$((end-start))
   if [ "$rc" -eq 0 ]; then
