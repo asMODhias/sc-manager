@@ -9,6 +9,8 @@ pub mod config;
 pub mod domain;
 pub mod storage;
 
+pub mod audit;
+
 pub mod api;
 pub mod publish;
 
