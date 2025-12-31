@@ -19,8 +19,6 @@ pub use rollback::{create_backup, transactional_replace, restore_backup};
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn crate_smoke() {
         // Basic smoke test to ensure the crate can be compiled and used
