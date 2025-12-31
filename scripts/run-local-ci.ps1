@@ -8,9 +8,42 @@ Get-ChildItem -Path . -Recurse -Filter Cargo.toml | Where-Object { $_.FullName -
     cargo fmt --manifest-path $manifest -- --check
 }
 
+Write-Host "==> Preflight: protoc check"
+# Check for protoc binary or PROTOC env var; if missing, skip crates that require protoc (prost)
+$protocFound = $false
+if ($env:PROTOC) {
+    if (Test-Path $env:PROTOC) { $protocFound = $true }
+} else {
+    if (Get-Command protoc -ErrorAction SilentlyContinue) { $protocFound = $true }
+}
+if (-not $protocFound) {
+    Write-Host "[warn] protoc not found. Crates that require `protoc` (prost) will be skipped. Install protoc or set PROTOC env var to enable them." -ForegroundColor Yellow
+    if ($env:PROTOC_AUTO_INSTALL -eq '1') {
+        Write-Host "[info] PROTOC_AUTO_INSTALL=1: attempting automated install via scripts/install-protoc.ps1"
+        try {
+            & "$PSScriptRoot\install-protoc.ps1"
+            # re-check
+            $protocFound = Found-Protoc
+            if ($protocFound) { Write-Host "[info] protoc installed successfully" ; $skipProtoc = $false }
+            else { Write-Host "[warn] automated install failed; skipping protoc-dependent crates" -ForegroundColor Yellow ; $skipProtoc = $true }
+        } catch {
+            Write-Host "[warn] automated install errored: $_" -ForegroundColor Yellow
+            $skipProtoc = $true
+        }
+    } else {
+        $skipProtoc = $true
+    }
+} else {
+    $skipProtoc = $false
+}
+
 Write-Host "==> Clippy (per-crate)"
 Get-ChildItem -Path . -Recurse -Filter Cargo.toml | Where-Object { $_.FullName -notmatch '\\patches\\|\\artifacts\\' } | ForEach-Object {
     $manifest = $_.FullName
+    if ($skipProtoc -and $manifest -match 'p2p') {
+        Write-Host "Skipping $manifest (requires protoc)"
+        return
+    }
     Write-Host "Clippy $manifest"
     cargo clippy --manifest-path $manifest --all-targets -- -D warnings
 }

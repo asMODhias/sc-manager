@@ -38,7 +38,7 @@ pub fn publish_update(ks: &KeyStore, ledger: &AppendOnlyLedger, entry: &UpdateEn
         "".to_string(),
     );
 
-    ledger.append(&ae).map_err(|e| PublishError::Io(std::io::Error::new(std::io::ErrorKind::Other, format!("append failed: {}", e))))?;
+    ledger.append(&ae).map_err(|e| PublishError::Io(std::io::Error::other(format!("append failed: {}", e))))?;
     Ok(())
 }
 
@@ -82,7 +82,7 @@ mod tests {
         let tf = NamedTempFile::new().expect("tmp");
         let ledger = AppendOnlyLedger::new(tf.path());
 
-        let mut u = UpdateEntry::new(
+        let u = UpdateEntry::new(
             "cid-002".into(),
             "2.0.1".into(),
             crate::domain::ReleaseChannel::Beta,

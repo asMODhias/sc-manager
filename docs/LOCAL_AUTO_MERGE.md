@@ -26,6 +26,13 @@ Requirements
 ------------
 - `gh` (GitHub CLI) installed and authenticated with an account that is allowed to perform admin-override merges.
 - Local CI scripts must be functional and trusted by the repo maintainers.
+- `protoc` (Protocol Buffers compiler) available on PATH or `PROTOC` environment variable set. Some crates (e.g., `prost-build` used by `libp2p` dependencies) require `protoc` to build.
+
+  Auto‑install options:
+  - PowerShell: pass `-AutoInstallProtoc` to `./scripts/auto-merge-local-ci.ps1` to attempt an automatic install via `choco` or `scoop` on Windows.
+  - Bash: pass `--auto-install` (or `-a`) to `./scripts/auto-merge-local-ci.sh` to attempt an automatic install via `brew`, `apt-get`, `yum`, or `pacman` depending on the system.
+
+  Note: package managers may require admin/sudo privileges to install system packages. If auto‑install is not possible, install `protoc` manually (see https://github.com/protocolbuffers/protobuf/releases) or set the `PROTOC` env var to the full path of a `protoc` binary.
 
 Audit & Governance
 ------------------

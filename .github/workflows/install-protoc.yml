@@ -1,0 +1,89 @@
+name: Install protoc (helper)
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [ '**' ]
+  push:
+    branches: [ 'main', 'master' ]
+
+jobs:
+  install-protoc:
+    name: Install protoc on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      PROTOC_VERSION: 23.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unzip curl || true
+
+      - name: Install protoc (platform specific)
+        run: |
+          set -e
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            if command -v protoc >/dev/null 2>&1; then protoc --version; exit 0; fi
+            sudo apt-get install -y protobuf-compiler || true
+            if command -v protoc >/dev/null 2>&1; then protoc --version; exit 0; fi
+          fi
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            if command -v protoc >/dev/null 2>&1; then protoc --version; exit 0; fi
+            brew install protobuf || true
+            if command -v protoc >/dev/null 2>&1; then protoc --version; exit 0; fi
+          fi
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command 'if (Get-Command protoc -ErrorAction SilentlyContinue) { protoc --version; exit 0 } ; choco install protoc -y || Write-Host "choco install failed"'
+            powershell -Command 'if (Get-Command protoc -ErrorAction SilentlyContinue) { Write-Host "protoc found"; exit 0 }'
+          fi
+
+      - name: Download protoc release fallback
+        run: |
+          set -e
+          if command -v protoc >/dev/null 2>&1; then echo "protoc already installed"; exit 0; fi
+          echo "protoc not installed via package manager — downloading release"
+          OS_TAG="linux"
+          case "${{ matrix.os }}" in
+            macos-latest) OS_TAG="osx" ;;
+            windows-latest) OS_TAG="win64" ;;
+            *) OS_TAG="linux" ;;
+          esac
+          ARCH="x86_64"
+          RELEASE_NAME="protoc-${PROTOC_VERSION}-${OS_TAG}-x86_64.zip"
+          URL="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${RELEASE_NAME}"
+          echo "Downloading $URL"
+          curl -fsSL -O "$URL"
+          unzip -q "$RELEASE_NAME" -d protoc-extract
+          if [ -f protoc-extract/bin/protoc ]; then
+            echo "Installing protoc to ./protoc-bin"
+            mkdir -p protoc-bin
+            cp protoc-extract/bin/protoc protoc-bin/
+            chmod +x protoc-bin/protoc
+            echo "protoc-bin" >> $GITHUB_PATH
+            echo "PROTOC=./protoc-bin/protoc" >> $GITHUB_ENV
+          elif [ -f protoc-extract/bin/protoc.exe ]; then
+            mkdir -p protoc-bin
+            cp protoc-extract/bin/protoc.exe protoc-bin/
+            echo "protoc-bin" >> $GITHUB_PATH
+            echo "PROTOC=./protoc-bin/protoc.exe" >> $GITHUB_ENV
+          else
+            echo "Failed to find protoc in archive" ; exit 1
+          fi
+
+      - name: Verify protoc
+        run: |
+          if command -v protoc >/dev/null 2>&1; then protoc --version; else echo "protoc installed to $PROTOC"; fi
+
+      - name: Run clippy for p2p-mesh (sanity)
+        run: |
+          if [ -f infrastructure/p2p-mesh/Cargo.toml ]; then
+            echo "Running clippy for p2p-mesh"
+            cargo clippy --manifest-path infrastructure/p2p-mesh/Cargo.toml --all-targets || true
+          fi

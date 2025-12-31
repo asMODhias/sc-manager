@@ -9,6 +9,9 @@ pub mod config;
 pub mod domain;
 pub mod storage;
 
+pub mod audit;
+pub mod marketplace;
+
 pub mod api;
 pub mod publish;
 
@@ -28,23 +31,26 @@ pub struct MasterServer {
     pub id: String,
     pub ks: KeyStore,
     pub ledger: Arc<AppendOnlyLedger>,
+    pub marketplace: Arc<tokio::sync::RwLock<crate::marketplace::Marketplace>>,
+    /// Optional admin token required for admin endpoints
+    pub admin_token: Option<String>,
 }
 
 impl Default for MasterServer {
     fn default() -> Self {
         let ledger = Arc::new(AppendOnlyLedger::new(std::env::temp_dir().join("master_ledger.ndjson")));
-        Self { id: "master-0".to_string(), ks: KeyStore::generate_testpair(), ledger }
+        Self { id: "master-0".to_string(), ks: KeyStore::generate_testpair(), ledger, marketplace: Arc::new(tokio::sync::RwLock::new(crate::marketplace::Marketplace::new())), admin_token: None }
     }
 }
 
 impl MasterServer {
     pub fn new(id: impl Into<String>, ks: KeyStore, ledger: Arc<AppendOnlyLedger>) -> Self {
-        Self { id: id.into(), ks, ledger }
+        Self { id: id.into(), ks, ledger, marketplace: Arc::new(tokio::sync::RwLock::new(crate::marketplace::Marketplace::new())), admin_token: None }
     }
 
     /// Helper to build from defaults (useful for tests)
     pub fn new_with_defaults(id: impl Into<String>) -> Self {
-        Self { id: id.into(), ks: KeyStore::generate_testpair(), ledger: Arc::new(AppendOnlyLedger::new(std::env::temp_dir().join("master_ledger.ndjson"))) }
+        Self { id: id.into(), ks: KeyStore::generate_testpair(), ledger: Arc::new(AppendOnlyLedger::new(std::env::temp_dir().join("master_ledger.ndjson"))), marketplace: Arc::new(tokio::sync::RwLock::new(crate::marketplace::Marketplace::new())), admin_token: None }
     }
 
     /// Run the server with provided address (non-blocking)
@@ -58,7 +64,7 @@ impl MasterServer {
     pub fn new_with_ledger(id: impl Into<String>, ledger_path: PathBuf) -> Self {
         let ks = KeyStore::generate_testpair();
         let ledger = Arc::new(AppendOnlyLedger::new(ledger_path));
-        Self { id: id.into(), ks, ledger }
+        Self { id: id.into(), ks, ledger, marketplace: Arc::new(tokio::sync::RwLock::new(crate::marketplace::Marketplace::new())), admin_token: None }
     }
 }
 

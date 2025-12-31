@@ -55,10 +55,7 @@ impl AppendOnlyLedger {
 
     /// Verify chain integrity across the ledger
     pub fn verify_chain(&self) -> Result<bool, LedgerError> {
-        let events = match self.load_all() {
-            Ok(e) => e,
-            Err(e) => return Err(e),
-        };
+        let events = self.load_all()?;
 
         if events.is_empty() {
             return Ok(true);

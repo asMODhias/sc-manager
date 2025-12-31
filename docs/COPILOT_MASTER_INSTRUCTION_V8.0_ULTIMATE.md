@@ -1553,16 +1553,20 @@ CRITICAL (Week 1-2):
       - infrastructure/p2p-mesh/src/mini_master/mod.rs
       - infrastructure/p2p-mesh/tests/*.rs
   
-  TASK-003: Master Server
+  TASK-003: Master Server (IN PROGRESS → marketplace persistence implemented)
     Priority: P0
-    Effort: 4 days
+    Effort: 4 days (ongoing)
     Blockers: TASK-001 (signature module)
+    Status: API implemented (`/health`, `/api/v1/updates`, `/api/v1/audit/events`, `/api/v1/marketplace/items`); Audit module and Marketplace implemented with append-only NDJSON ledger and snapshot/compaction support. Unit and integration tests added.
     Files:
-      - apps/master-server/src/main.rs
-      - apps/master-server/src/api/mod.rs
-      - apps/master-server/src/audit/mod.rs
-      - apps/master-server/src/marketplace/mod.rs
-      - apps/master-server/tests/*.rs
+      - services/master-server/src/lib.rs
+      - services/master-server/src/api.rs
+      - services/master-server/src/audit/mod.rs
+      - services/master-server/src/marketplace/mod.rs
+      - services/master-server/src/marketplace/storage.rs
+      - services/master-server/tests/*.rs
+    Docs:
+      - docs/MASTER_SERVER_API.md (API contract, persistence and snapshot notes)
 
 HIGH (Week 3-4):
   TASK-004: Domain Models
