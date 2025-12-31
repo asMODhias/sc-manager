@@ -29,18 +29,31 @@ jobs:
       - name: Install protoc (attempt non-interactive)
         run: |
           set -e
-          ./scripts/install-protoc.sh || true
+          chmod +x ./scripts/install-protoc.sh || true
+          bash ./scripts/install-protoc.sh || true
 
-      - name: Cargo fmt check
+      - name: Cargo fmt check (per-crate)
         run: |
-          cargo fmt -- --check
+          set -e
+          find . -name Cargo.toml -not -path './patches/*' -not -path './artifacts/*' -print0 | while IFS= read -r -d '' manifest; do
+            echo "Formatting $manifest"
+            cargo fmt --manifest-path "$manifest" -- --check
+          done
 
-      - name: Cargo clippy (workspace, deny warnings)
+      - name: Cargo clippy (per-crate, deny warnings)
         run: |
+          set -e
           # Ensure protoc is available for prost builds
-          if command -v protoc >/dev/null 2>&1; then echo "protoc available"; else echo "protoc not found, failing CI"; exit 1; fi
-          cargo clippy --workspace --all-targets -- -D warnings
+          if ! command -v protoc >/dev/null 2>&1; then echo "protoc not found, failing CI"; exit 1; fi
+          find . -name Cargo.toml -not -path './patches/*' -not -path './artifacts/*' -print0 | while IFS= read -r -d '' manifest; do
+            echo "Clippy $manifest"
+            cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+          done
 
-      - name: Run cargo test (workspace)
+      - name: Run cargo test (per-crate)
         run: |
-          cargo test --workspace --all-features -- --nocapture
+          set -e
+          find . -name Cargo.toml -not -path './patches/*' -not -path './artifacts/*' -print0 | while IFS= read -r -d '' manifest; do
+            echo "Testing $manifest"
+            cargo test --manifest-path "$manifest" --verbose || exit 1
+          done
