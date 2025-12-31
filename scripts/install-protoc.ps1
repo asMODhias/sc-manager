@@ -19,13 +19,21 @@ if ($IsWindows) {
     # Try choco
     if (Get-Command choco -ErrorAction SilentlyContinue) {
         Write-Host "[install-protoc] choco detected — trying 'choco install protoc'"
-        choco install protoc -y || Write-Host "[install-protoc] choco install failed" -ForegroundColor Yellow
+        try {
+            & choco install protoc -y
+        } catch {
+            Write-Host "[install-protoc] choco install failed:" $_ -ForegroundColor Yellow
+        }
         if (Found-Protoc) { Write-Host "[install-protoc] protoc installed via choco" ; exit 0 }
     }
     # Try scoop
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
         Write-Host "[install-protoc] scoop detected — trying 'scoop install protoc'"
-        scoop install protoc || Write-Host "[install-protoc] scoop install failed" -ForegroundColor Yellow
+        try {
+            & scoop install protoc
+        } catch {
+            Write-Host "[install-protoc] scoop install failed:" $_ -ForegroundColor Yellow
+        }
         if (Found-Protoc) { Write-Host "[install-protoc] protoc installed via scoop" ; exit 0 }
     }
     # Fallback: download zip release
@@ -49,7 +57,11 @@ if ($IsWindows) {
     # macOS / Linux
     if (Get-Command brew -ErrorAction SilentlyContinue) {
         Write-Host "[install-protoc] Homebrew detected — attempting 'brew install protobuf'"
-        brew install protobuf || Write-Host "[install-protoc] brew install failed" -ForegroundColor Yellow
+        try {
+            & brew install protobuf
+        } catch {
+            Write-Host "[install-protoc] brew install failed: $_" -ForegroundColor Yellow
+        }
         if (Found-Protoc) { Write-Host "[install-protoc] protoc installed via brew" ; exit 0 }
     }
 
@@ -58,9 +70,17 @@ if ($IsWindows) {
         $sudoAvailable = $false
         try { sudo -n true; $sudoAvailable = $true } catch { $sudoAvailable = $false }
         if ($sudoAvailable) {
-            sudo apt-get update; sudo apt-get install -y protobuf-compiler || Write-Host "[install-protoc] apt-get failed" -ForegroundColor Yellow
+            try {
+                sudo apt-get update; sudo apt-get install -y protobuf-compiler
+            } catch {
+                Write-Host "[install-protoc] apt-get failed:" $_ -ForegroundColor Yellow
+            }
         } elseif ([int](whoami -u) -eq 0) {
-            apt-get update; apt-get install -y protobuf-compiler || Write-Host "[install-protoc] apt-get failed" -ForegroundColor Yellow
+            try {
+                apt-get update; apt-get install -y protobuf-compiler
+            } catch {
+                Write-Host "[install-protoc] apt-get failed:" $_ -ForegroundColor Yellow
+            }
         } else {
             Write-Host "[install-protoc] sudo not available or requires password; skipping apt-get (will try download fallback)" -ForegroundColor Yellow
         }
@@ -72,9 +92,17 @@ if ($IsWindows) {
         $sudoAvailable = $false
         try { sudo -n true; $sudoAvailable = $true } catch { $sudoAvailable = $false }
         if ($sudoAvailable) {
-            sudo yum install -y protobuf-compiler || Write-Host "[install-protoc] yum failed" -ForegroundColor Yellow
+            try {
+                sudo yum install -y protobuf-compiler
+            } catch {
+                Write-Host "[install-protoc] yum failed: $_" -ForegroundColor Yellow
+            }
         } elseif ([int](whoami -u) -eq 0) {
-            yum install -y protobuf-compiler || Write-Host "[install-protoc] yum failed" -ForegroundColor Yellow
+            try {
+                yum install -y protobuf-compiler
+            } catch {
+                Write-Host "[install-protoc] yum failed: $_" -ForegroundColor Yellow
+            }
         } else {
             Write-Host "[install-protoc] sudo not available or requires password; skipping yum (will try download fallback)" -ForegroundColor Yellow
         }
